@@ -1,7 +1,5 @@
+#include <format>
 #include <SDL3/SDL.h>
-/*
- * SDL3/SDL_main.h is explicitly not included such that a terminal window would appear on Windows.
- */
 
 int main(int argc, char* argv[]) {
 	(void)argc;
@@ -19,6 +17,20 @@ int main(int argc, char* argv[]) {
 		SDL_Quit();
 		return 1;
 	}
+
+	SDL_Surface* surface = SDL_LoadBMP(std::format("{}\\data\\audiofile.bmp", SDL_GetBasePath()).c_str());
+	if (!surface) {
+		SDL_Log("Couldn't load bitmap: %s", SDL_GetError());
+		return 1;
+	}
+
+	SDL_Texture* texture = SDL_CreateTextureFromSurface(renderer, surface);
+	if (!texture) {
+		SDL_Log("Couldn't create static texture: %s", SDL_GetError());
+		return SDL_APP_FAILURE;
+	}
+
+	SDL_DestroySurface(surface);
 
 	bool foo = false;
 	while (1) {
@@ -49,6 +61,13 @@ int main(int argc, char* argv[]) {
 
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
 		SDL_RenderDebugText(renderer, 5, 5, foo ? "Key pressed" : "Hello world!");
+
+		SDL_FRect dst_rect;
+		dst_rect.x = 32;
+		dst_rect.y = 32;
+		dst_rect.w = 64;
+		dst_rect.h = 64;
+		SDL_RenderTexture(renderer, texture, NULL, &dst_rect);
 
 		SDL_RenderPresent(renderer);
 	}

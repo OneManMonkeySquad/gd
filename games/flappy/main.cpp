@@ -20,6 +20,7 @@ int main(int argc, char* argv[]) {
 		return 1;
 	}
 
+	bool foo = false;
 	while (1) {
 		int finished = 0;
 		SDL_Event event;
@@ -27,6 +28,17 @@ int main(int argc, char* argv[]) {
 			if (event.type == SDL_EVENT_QUIT) {
 				finished = 1;
 				break;
+			}
+			if (event.type == SDL_EVENT_KEY_DOWN)
+			{
+				if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+				{
+					finished = true;
+				}
+				else
+				{
+					foo = true;
+				}
 			}
 		}
 		if (finished)
@@ -36,7 +48,7 @@ int main(int argc, char* argv[]) {
 		SDL_RenderClear(renderer);
 
 		SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
-		SDL_RenderDebugText(renderer, 5, 5, "Hello world!");
+		SDL_RenderDebugText(renderer, 5, 5, foo ? "Key pressed" : "Hello world!");
 
 		SDL_RenderPresent(renderer);
 	}

@@ -14,8 +14,7 @@ int main(int argc, char* argv[]) {
 
 	SDL_Window* window = NULL;
 	SDL_Renderer* renderer = NULL;
-
-	if (!SDL_CreateWindowAndRenderer("SDL issue", 640, 480, 0, &window, &renderer)) {
+	if (!SDL_CreateWindowAndRenderer("SDL issue", 800, 600, 0, &window, &renderer)) {
 		SDL_Log("SDL_CreateWindowAndRenderer failed (%s)", SDL_GetError());
 		SDL_Quit();
 		return 1;
@@ -30,12 +29,15 @@ int main(int argc, char* argv[]) {
 				break;
 			}
 		}
-		if (finished) {
+		if (finished)
 			break;
-		}
 
 		SDL_SetRenderDrawColor(renderer, 80, 80, 80, SDL_ALPHA_OPAQUE);
 		SDL_RenderClear(renderer);
+
+		SDL_SetRenderDrawColor(renderer, 255, 255, 255, SDL_ALPHA_OPAQUE);
+		SDL_RenderDebugText(renderer, 5, 5, "Hello world!");
+
 		SDL_RenderPresent(renderer);
 	}
 

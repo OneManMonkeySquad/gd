@@ -1,8 +1,8 @@
-set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD 23)
 
 add_executable(flappy main.cpp)
 
-target_link_libraries(flappy PRIVATE SDL3::SDL3)
+target_link_libraries(flappy PRIVATE SDL3::SDL3 EnTT::EnTT)
 
 add_custom_command(TARGET flappy POST_BUILD
      COMMAND ${CMAKE_COMMAND} -E copy_if_different

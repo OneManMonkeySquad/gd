@@ -1,6 +1,7 @@
 #include <format>
 #include <expected>
 #include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
 #include <entt/entt.hpp>
 
 using texture_handle = size_t;
@@ -24,7 +25,9 @@ struct sprite_mananger {
 
 	std::expected<texture_handle, error> load_sprite(std::string path)
 	{
-		SDL_Surface* surface = SDL_LoadBMP(path.c_str());
+		SDL_Surface* surface = IMG_Load(path.c_str());
+
+		//SDL_Surface* surface = SDL_LoadBMP(path.c_str());
 		if (!surface)
 			return std::unexpected(error{ .message = SDL_GetError() });
 
@@ -118,7 +121,7 @@ int main(int argc, char* argv[]) {
 
 	entt::registry registry;
 
-	auto textureIdx = game.sprite_manager->load_sprite(std::format("{}\\data\\audiofile.bmp", SDL_GetBasePath()));
+	auto textureIdx = game.sprite_manager->load_sprite(std::format("{}\\data\\sprites\\bluebird-downflap.png", SDL_GetBasePath()));
 
 	auto birdEntity = registry.create();
 	registry.emplace<position>(birdEntity, 0.f, 0.f);

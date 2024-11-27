@@ -1,9 +1,10 @@
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-add_executable(flappy WIN32 main.cpp game.ixx)
+add_executable(flappy main.cpp game.ixx)
 
 target_compile_definitions(flappy PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
+target_link_options(flappy PRIVATE "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
 
 target_link_libraries(flappy
     PRIVATE SDL3::SDL3 SDL3_image::SDL3_image EnTT::EnTT)

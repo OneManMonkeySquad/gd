@@ -1,10 +1,6 @@
-
-#include <windows.h>
-
 import game;
 
-int WINAPI WinMain(HINSTANCE hInstance, HINSTANCE hPrevInstance,
-	PSTR lpCmdLine, int nCmdShow)
+int main()
 {
 	return run_game();
 }

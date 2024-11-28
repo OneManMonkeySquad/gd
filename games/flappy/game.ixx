@@ -21,8 +21,9 @@ struct game {
 struct bird {};
 struct pipe {};
 
-struct position {
+struct transform {
 	float2 value;
+	float angle;
 };
 
 struct velocity {
@@ -73,15 +74,20 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 		auto pipeTexture = engine.sprite_manager->load_sprite("sprites\\pipe-red.png");
 
 		auto birdEntity = registry.create();
-		registry.emplace<position>(birdEntity, float2{ 288 * 0.5f - 32, 512 * 0.5f + 32 });
+		registry.emplace<transform>(birdEntity, float2{ 288 * 0.5f, 512 * 0.5f });
 		registry.emplace<sprite>(birdEntity, *birdTexture, float2{ 64,64 });
 		registry.emplace<velocity>(birdEntity, float2{ 0, 0 });
 		registry.emplace<bird>(birdEntity);
 
 		auto pipeEntity = registry.create();
-		registry.emplace<position>(pipeEntity, float2{ 70.f, 130.f });
-		registry.emplace<sprite>(pipeEntity, *pipeTexture, float2{ 64,128 });
+		registry.emplace<transform>(pipeEntity, float2{ 70.f, 220 * 0.5f });
+		registry.emplace<sprite>(pipeEntity, *pipeTexture, float2{ 64,220 });
 		registry.emplace<pipe>(pipeEntity);
+
+		auto pipe2Entity = registry.create();
+		registry.emplace<transform>(pipe2Entity, float2{ 70.f, 512 - 220 * 0.5f }, 180.f);
+		registry.emplace<sprite>(pipe2Entity, *pipeTexture, float2{ 64,220 });
+		registry.emplace<pipe>(pipe2Entity);
 
 		game.state = game_state::running;
 	}
@@ -89,22 +95,39 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 	{
 		// simulate
 		registry.view<bird, velocity>().each([&](auto& velo) {
-			velo.linear.y = birdFlap ? 1000 : 0;
+			velo.linear.y += birdFlap ? 8 : 0;
 			});
 
 		auto birdView = registry.view<bird, velocity>();
 		for (auto entity : birdView) {
 			auto [velocity] = birdView.get(entity);
-			velocity.linear.y -= 10;
+			velocity.linear.y -= 0.7f;
 		}
 
-		registry.view<velocity, position>().each([](velocity& velocity, position& position) {
+		registry.view<velocity, transform>().each([](auto& velocity, auto& position) {
 			position.value += velocity.linear;
 			});
 
 		bool lost = false;
-		registry.view<bird, position>().each([&](auto& pos) {
-			if (pos.value.y < -100 || pos.value.y > 500)
+		float2 birdPos;
+		registry.view<bird, transform>().each([&](auto& tf) {
+			birdPos = tf.value;
+			if (tf.value.y < 0 || tf.value.y > 500)
+			{
+				lost = true;
+			}
+			});
+
+		registry.view<pipe, transform>().each([&](auto& tf) {
+			tf.value.x -= 5;
+			if (tf.value.x < -60)
+			{
+				tf.value.x = 300;
+			}
+
+			SDL_FPoint birdP{ birdPos.x, birdPos.y };
+			SDL_FRect rect{ tf.value.x - 32, tf.value.y - 110, 64, 220 };
+			if (SDL_PointInRectFloat(&birdP, &rect))
 			{
 				lost = true;
 			}
@@ -115,14 +138,6 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 			game.state = game_state::lost;
 			game.death_time = 2;
 		}
-
-		registry.view<pipe, position>().each([&](auto& pos) {
-			pos.value.x -= 5;
-			if (pos.value.x < -60)
-			{
-				pos.value.x = 300;
-			}
-			});
 	}
 	else if (game.state == game_state::lost)
 	{
@@ -167,15 +182,17 @@ std::expected<void, error> game_render(engine& engine, const entt::registry& reg
 	SDL_RenderDebugText(engine.renderer, 5, 5, std::to_string((int)game.state).c_str());
 
 	// draw sprites
-	auto rendableView = registry.view<position, sprite>();
-	rendableView.each([&](auto& pos, auto& sprite)
-		{
-			SDL_FRect dst_rect;
-			dst_rect.x = pos.value.x;
-			dst_rect.y = windowHeight - pos.value.y;
-			dst_rect.w = sprite.size.x;
-			dst_rect.h = sprite.size.y;
-			SDL_RenderTexture(engine.renderer, engine.sprite_manager->textures[sprite.texture], NULL, &dst_rect);
+	auto rendableView = registry.view<transform, sprite>();
+	rendableView.each([&](auto& pos, auto& sprite) {
+		SDL_FRect dst_rect;
+		dst_rect.x = pos.value.x - sprite.size.x * 0.5f;
+		dst_rect.y = (windowHeight - pos.value.y) - sprite.size.y * 0.5f;
+		dst_rect.w = sprite.size.x;
+		dst_rect.h = sprite.size.y;
+
+		auto texture = engine.sprite_manager->textures[sprite.texture];
+
+		SDL_RenderTextureRotated(engine.renderer, texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE);
 		});
 
 	// draw game over
@@ -210,7 +227,8 @@ export void run_game()
 		bool quit = false;
 		Uint64 lastTime = 0;
 		float accTime = 0;
-		while (!quit) {
+		while (!quit)
+		{
 			Uint64 time = SDL_GetPerformanceCounter();
 			float secondsElapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
 			if (secondsElapsed > 0.25f)

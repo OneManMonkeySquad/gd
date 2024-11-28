@@ -1,8 +1,8 @@
 export module engine;
 
-import std;
 import <SDL3/SDL.h>;
 import <SDL3_image/SDL_image.h>;
+import std;
 import math;
 
 export using texture_handle = size_t;
@@ -75,6 +75,9 @@ export std::expected<engine, error> engine_init()
 
 	engine game;
 	if (!SDL_CreateWindowAndRenderer("SDL issue", 288, 512, 0, &game.window, &game.renderer))
+		return std::unexpected(error{ .message = SDL_GetError() });
+
+	if(!SDL_SetRenderVSync(game.renderer, 1)) // always vsync for now to keep framerate sane
 		return std::unexpected(error{ .message = SDL_GetError() });
 
 	game.sprite_manager = new sprite_mananger(game.renderer);

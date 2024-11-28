@@ -15,6 +15,7 @@ enum class game_state {
 
 struct game {
 	game_state state;
+	float death_time;
 };
 
 struct bird {};
@@ -39,10 +40,32 @@ void game_start(engine& engine, entt::registry& registry)
 	ctx.emplace<game>();
 }
 
+const auto fixed_time_step = 1.f / 30.f;
+
 std::expected<update_result, error> game_fixed_update(engine& engine, entt::registry& registry)
 {
 	auto& ctx = registry.ctx();
 	auto& game = ctx.get<::game>();
+
+	// handle events
+	bool birdFlap = false;
+
+	SDL_Event event;
+	while (SDL_PollEvent(&event)) {
+		if (event.type == SDL_EVENT_QUIT)
+			return update_result::quit;
+
+		if (event.type == SDL_EVENT_KEY_DOWN)
+		{
+			if (event.key.scancode == SDL_SCANCODE_ESCAPE)
+				return update_result::quit;
+
+			if (event.key.scancode == SDL_SCANCODE_SPACE)
+			{
+				birdFlap = true;
+			}
+		}
+	}
 
 	if (game.state == game_state::none)
 	{
@@ -50,13 +73,13 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 		auto pipeTexture = engine.sprite_manager->load_sprite("sprites\\pipe-red.png");
 
 		auto birdEntity = registry.create();
-		registry.emplace<position>(birdEntity, float2{ 288 * 0.5f, 512 * 0.5f });
+		registry.emplace<position>(birdEntity, float2{ 288 * 0.5f - 32, 512 * 0.5f + 32 });
 		registry.emplace<sprite>(birdEntity, *birdTexture, float2{ 64,64 });
 		registry.emplace<velocity>(birdEntity, float2{ 0, 0 });
 		registry.emplace<bird>(birdEntity);
 
 		auto pipeEntity = registry.create();
-		registry.emplace<position>(pipeEntity, float2{ 70.f, 150.f });
+		registry.emplace<position>(pipeEntity, float2{ 70.f, 130.f });
 		registry.emplace<sprite>(pipeEntity, *pipeTexture, float2{ 64,128 });
 		registry.emplace<pipe>(pipeEntity);
 
@@ -64,46 +87,24 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 	}
 	else if (game.state == game_state::running)
 	{
-		bool birdFlap = false;
-
-		// handle events
-		SDL_Event event;
-		while (SDL_PollEvent(&event)) {
-			if (event.type == SDL_EVENT_QUIT)
-				return update_result::quit;
-
-			if (event.type == SDL_EVENT_KEY_DOWN)
-			{
-				if (event.key.scancode == SDL_SCANCODE_ESCAPE)
-					return update_result::quit;
-
-				if (event.key.scancode == SDL_SCANCODE_SPACE)
-				{
-					birdFlap = true;
-				}
-			}
-		}
-
 		// simulate
 		registry.view<bird, velocity>().each([&](auto& velo) {
-			velo.linear.y = birdFlap ? 9000 : 0;
+			velo.linear.y = birdFlap ? 1000 : 0;
 			});
 
 		auto birdView = registry.view<bird, velocity>();
 		for (auto entity : birdView) {
 			auto [velocity] = birdView.get(entity);
-			velocity.linear.y -= 0.3f;
+			velocity.linear.y -= 10;
 		}
 
 		registry.view<velocity, position>().each([](velocity& velocity, position& position) {
-			auto dt = (1.f / 30.f) * 0.5f;
-			position.value += velocity.linear * dt;
-			velocity.linear *= 1 - dt;
+			position.value += velocity.linear;
 			});
 
 		bool lost = false;
 		registry.view<bird, position>().each([&](auto& pos) {
-			if (pos.value.y < -100)
+			if (pos.value.y < -100 || pos.value.y > 500)
 			{
 				lost = true;
 			}
@@ -112,10 +113,11 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 		if (lost)
 		{
 			game.state = game_state::lost;
+			game.death_time = 2;
 		}
 
 		registry.view<pipe, position>().each([&](auto& pos) {
-			pos.value.x -= 0.01f;
+			pos.value.x -= 5;
 			if (pos.value.x < -60)
 			{
 				pos.value.x = 300;
@@ -124,8 +126,12 @@ std::expected<update_result, error> game_fixed_update(engine& engine, entt::regi
 	}
 	else if (game.state == game_state::lost)
 	{
-		registry.clear(); // reset game
-		game.state = game_state::none;
+		game.death_time -= fixed_time_step;
+		if (game.death_time <= 0)
+		{
+			registry.clear(); // reset game
+			game.state = game_state::none;
+		}
 	}
 
 	return update_result::keep_running;
@@ -146,14 +152,14 @@ std::expected<void, error> game_render(engine& engine, const entt::registry& reg
 
 	// draw background
 	{
-		auto bgTexture = engine.sprite_manager->load_sprite("sprites\\background-day.png");
+		auto bgTexture = *engine.sprite_manager->load_sprite("sprites\\background-day.png");
 
 		SDL_FRect dst_rect;
 		dst_rect.x = 0;
 		dst_rect.y = 0;
 		dst_rect.w = 288;
 		dst_rect.h = 512;
-		SDL_RenderTexture(engine.renderer, engine.sprite_manager->textures[*bgTexture], NULL, &dst_rect);
+		SDL_RenderTexture(engine.renderer, engine.sprite_manager->textures[bgTexture], NULL, &dst_rect);
 	}
 
 	// draw debug text
@@ -172,6 +178,20 @@ std::expected<void, error> game_render(engine& engine, const entt::registry& reg
 			SDL_RenderTexture(engine.renderer, engine.sprite_manager->textures[sprite.texture], NULL, &dst_rect);
 		});
 
+	// draw game over
+	if (game.state == game_state::lost)
+	{
+		auto bgTexture = *engine.sprite_manager->load_sprite("sprites\\gameover.png");
+
+		SDL_FRect dst_rect;
+		dst_rect.x = 288 * 0.5f - 192 * 0.5f;
+		dst_rect.y = 512 * 0.5f - 42 * 0.5f;
+		dst_rect.w = 192;
+		dst_rect.h = 42;
+		SDL_RenderTexture(engine.renderer, engine.sprite_manager->textures[bgTexture], NULL, &dst_rect);
+	}
+
+	// present
 	if (!SDL_RenderPresent(engine.renderer))
 		return std::unexpected(error{ .message = SDL_GetError() });
 
@@ -190,7 +210,6 @@ export void run_game()
 		bool quit = false;
 		Uint64 lastTime = 0;
 		float accTime = 0;
-		const float timeStep = 1.f / 30.f;
 		while (!quit) {
 			Uint64 time = SDL_GetPerformanceCounter();
 			float secondsElapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
@@ -198,12 +217,13 @@ export void run_game()
 			{
 				secondsElapsed = 0.25f;
 			}
+			lastTime = time;
 
 			accTime += secondsElapsed;
 
-			while (accTime >= timeStep)
+			while (accTime >= fixed_time_step)
 			{
-				accTime -= timeStep;
+				accTime -= fixed_time_step;
 				if (game_fixed_update(engine, registry) != update_result::keep_running)
 				{
 					quit = true;

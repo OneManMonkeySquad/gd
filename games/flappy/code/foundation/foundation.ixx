@@ -48,9 +48,22 @@ namespace foundation
     };
 
 
+    // #todo this is all unused
+    export using object_id = uint64_t;
+    export class ITheTruth
+    {
+    public:
+        virtual ~ITheTruth() = default;
 
+        virtual object_id create_object_of_type(int asset_type) = 0;
 
+        virtual const void* read(object_id id) = 0;
+        virtual float get_float(void* reader, std::string property) = 0;
 
+        virtual void* write(object_id id) = 0;
+        virtual void set_float(void* writer, std::string property, float value) = 0;
+        virtual void commit(void* writer) = 0;
+    };
 
     export class IEngine
     {

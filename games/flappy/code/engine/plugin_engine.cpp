@@ -1,7 +1,6 @@
 import foundation;
 import std;
 import <SDL3/SDL.h>;
-import <SDL3_image/SDL_image.h>;
 
 class MyEngine : public foundation::IEngine
 {
@@ -19,6 +18,8 @@ public:
 
         if (!SDL_SetRenderVSync(_renderer, 1)) // always vsync for now to keep framerate sane
             return std::unexpected(foundation::error{ .message = SDL_GetError() });
+
+        return {};
     }
 
     void deinit() override

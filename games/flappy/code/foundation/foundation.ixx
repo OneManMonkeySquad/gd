@@ -6,12 +6,22 @@ import <Windows.h>;
 
 namespace foundation
 {
+    export void clear_log()
+    {
+        std::ofstream outfile;
+        outfile.open("game.log", std::ios_base::trunc);
+    }
+
     export template<typename... Args>
         void println(std::format_string<Args...> fmt, Args&&... args)
     {
         auto str = std::format(fmt, std::forward<Args>(args)...);
         str += '\n';
         ::OutputDebugStringA(str.c_str());
+
+        std::ofstream outfile;
+        outfile.open("game.log", std::ios_base::app);
+        outfile << str;
     }
 
 
@@ -70,7 +80,7 @@ namespace foundation
     public:
         virtual ~IEngine() = default;
 
-        virtual std::expected<void, error> init() = 0;
+        virtual std::expected<void, error> init(int width, int height, const char* title) = 0;
         virtual void deinit() = 0;
 
         virtual SDL_Window* window() = 0;
@@ -93,7 +103,9 @@ namespace foundation
     public:
         virtual ~IGame() = default;
 
-        virtual void run() = 0;
+        virtual void start() = 0;
+        virtual bool run_once() = 0;
+        virtual void exit() = 0;
     };
 
 

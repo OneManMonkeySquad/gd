@@ -8,12 +8,12 @@ public:
     SDL_Window* _window = nullptr;
     SDL_Renderer* _renderer = nullptr;
 
-    std::expected<void, foundation::error> init() override
+    std::expected<void, foundation::error> init(int width, int height, const char* title) override
     {
         if (!SDL_Init(SDL_INIT_VIDEO))
             return std::unexpected(foundation::error{ .message = SDL_GetError() });
 
-        if (!SDL_CreateWindowAndRenderer("SDL issue", 288, 512, 0, &_window, &_renderer))
+        if (!SDL_CreateWindowAndRenderer(title, width, height, 0, &_window, &_renderer))
             return std::unexpected(foundation::error{ .message = SDL_GetError() });
 
         if (!SDL_SetRenderVSync(_renderer, 1)) // always vsync for now to keep framerate sane

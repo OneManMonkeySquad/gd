@@ -46,46 +46,48 @@ class MyGame : public foundation::IGame
 {
 public:
     foundation::api_registry& api;
+    entt::registry registry;
+    Uint64 lastTime = 0;
+    float accTime = 0;
 
     MyGame(foundation::api_registry& api) : api(api) {}
 
-    void run() override
+    void start() override
     {
         auto engine = (foundation::IEngine*)api.first("engine");
-        engine->init();
+        engine->init(288, 512, "Flappy");
 
-        entt::registry registry;
         game_start(registry);
+    }
 
-        bool quit = false;
-        Uint64 lastTime = 0;
-        float accTime = 0;
-        while (!quit)
+    bool run_once() override
+    {
+        Uint64 time = SDL_GetPerformanceCounter();
+        float secondsElapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
+        if (secondsElapsed > 0.25f)
         {
-            Uint64 time = SDL_GetPerformanceCounter();
-            float secondsElapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
-            if (secondsElapsed > 0.25f)
-            {
-                secondsElapsed = 0.25f;
-            }
-            lastTime = time;
+            secondsElapsed = 0.25f;
+        }
+        lastTime = time;
 
-            accTime += secondsElapsed;
+        accTime += secondsElapsed;
 
-            while (accTime >= fixed_time_step)
-            {
-                accTime -= fixed_time_step;
-                if (game_fixed_update(registry) != update_result::keep_running)
-                {
-                    quit = true;
-                    break;
-                }
-            }
-
-            // #todo interpolate rendering
-            *game_render(registry);
+        while (accTime >= fixed_time_step)
+        {
+            accTime -= fixed_time_step;
+            if (game_fixed_update(registry) != update_result::keep_running)
+                return false;
         }
 
+        // #todo interpolate rendering
+        *game_render(registry);
+
+        return true;
+    }
+
+    void exit() override
+    {
+        auto engine = (foundation::IEngine*)api.first("engine");
         engine->deinit();
     }
 
@@ -236,8 +238,8 @@ public:
         }
 
         // draw debug text
-        SDL_SetRenderDrawColor(engine->renderer(), 255, 255, 255, SDL_ALPHA_OPAQUE);
-        SDL_RenderDebugText(engine->renderer(), 5, 5, std::to_string((int)game.state).c_str());
+       // SDL_SetRenderDrawColor(engine->renderer(), 255, 255, 255, SDL_ALPHA_OPAQUE);
+       // SDL_RenderDebugText(engine->renderer(), 5, 5, std::to_string((int)game.state).c_str());
 
         // draw sprites
         auto rendableView = registry.view<transform, sprite>();

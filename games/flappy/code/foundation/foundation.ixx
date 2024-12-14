@@ -1,31 +1,20 @@
+module;
+
+#include <Windows.h>
+
 export module foundation;
 
 import std;
 import <SDL3/SDL.h>;
-import <Windows.h>;
+
+export import :math;
+export import :global_exception_handler;
+export import :print;
+export import :plugin_manager;
+export import :api_registry;
 
 namespace foundation
 {
-    export void clear_log()
-    {
-        std::ofstream outfile;
-        outfile.open("game.log", std::ios_base::trunc);
-    }
-
-    export template<typename... Args>
-        void println(std::format_string<Args...> fmt, Args&&... args)
-    {
-        auto str = std::format(fmt, std::forward<Args>(args)...);
-        str += '\n';
-        ::OutputDebugStringA(str.c_str());
-
-        std::ofstream outfile;
-        outfile.open("game.log", std::ios_base::app);
-        outfile << str;
-    }
-
-
-
     export enum class error_code {
         unknown,
     };
@@ -37,25 +26,7 @@ namespace foundation
 
 
 
-    export struct api_registry
-    {
-        std::vector<std::pair<std::string, void*>> foo;
 
-        void add(std::string name, void* api)
-        {
-            foo.push_back(std::make_pair(name, api));
-        }
-
-        void* first(std::string name)
-        {
-            for (auto& pair : foo)
-            {
-                if (pair.first == name)
-                    return pair.second;
-            }
-            return nullptr;
-        }
-    };
 
 
     // #todo this is all unused
@@ -107,39 +78,4 @@ namespace foundation
         virtual bool run_once() = 0;
         virtual void exit() = 0;
     };
-
-
-
-
-
-    export struct float2 {
-        float x;
-        float y;
-    };
-
-    export constexpr float2& operator*=(float2& lhs, const float rhs)
-    {
-        lhs.x *= rhs;
-        lhs.y *= rhs;
-        return lhs;
-    }
-
-    export constexpr float2& operator+=(float2& lhs, const float rhs)
-    {
-        lhs.x += rhs;
-        lhs.y += rhs;
-        return lhs;
-    }
-
-    export constexpr float2& operator+=(float2& lhs, const float2& rhs)
-    {
-        lhs.x += rhs.x;
-        lhs.y += rhs.y;
-        return lhs;
-    }
-
-    export constexpr float2 operator*(float2 lhs, const float rhs)
-    {
-        return lhs *= rhs;
-    }
 }

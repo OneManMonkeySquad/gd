@@ -53,13 +53,19 @@ public:
     }
 };
 
-extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api)
+namespace
 {
-    auto foo = new MySpriteManager(api);
+    MySpriteManager* foo;
+}
+
+extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
+{
+    foo = new MySpriteManager(api);
     api.add("sprite_manager", foo);
 }
 
-extern "C" __declspec(dllexport) void plugin_unload()
+extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)
 {
-
+    api.remove(foo);
+    delete foo;
 }

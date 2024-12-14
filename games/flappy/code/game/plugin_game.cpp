@@ -1,6 +1,7 @@
 import foundation;
 import <SDL3/SDL.h>;
 import <entt/entt.hpp>;
+import <nlohmann/json.hpp>;
 import std;
 
 enum class game_state {
@@ -57,7 +58,8 @@ public:
         auto engine = (foundation::IEngine*)api.first("engine");
         engine->init(288, 512, "Flappy");
 
-        game_start(registry);
+        auto& ctx = registry.ctx();
+        ctx.emplace<::game>();
     }
 
     bool run_once() override
@@ -89,12 +91,6 @@ public:
     {
         auto engine = (foundation::IEngine*)api.first("engine");
         engine->deinit();
-    }
-
-    void game_start(entt::registry& registry)
-    {
-        auto& ctx = registry.ctx();
-        ctx.emplace<game>();
     }
 
     std::expected<update_result, foundation::error> game_fixed_update(entt::registry& registry)
@@ -152,13 +148,13 @@ public:
         {
             // simulate
             registry.view<bird, velocity>().each([&](auto& velo) {
-                velo.linear.y += birdFlap ? 8 : 0;
+                velo.linear.y += birdFlap ? 4 : 0;
                 });
 
             auto birdView = registry.view<bird, velocity>();
             for (auto entity : birdView) {
                 auto [velocity] = birdView.get(entity);
-                velocity.linear.y -= 0.7f;
+                velocity.linear.y -= 0.02f;
             }
 
             registry.view<velocity, transform>().each([](auto& velocity, auto& position) {
@@ -238,8 +234,8 @@ public:
         }
 
         // draw debug text
-       // SDL_SetRenderDrawColor(engine->renderer(), 255, 255, 255, SDL_ALPHA_OPAQUE);
-       // SDL_RenderDebugText(engine->renderer(), 5, 5, std::to_string((int)game.state).c_str());
+        // SDL_SetRenderDrawColor(engine->renderer(), 255, 255, 255, SDL_ALPHA_OPAQUE);
+        // SDL_RenderDebugText(engine->renderer(), 5, 5, std::to_string((int)game.state).c_str());
 
         // draw sprites
         auto rendableView = registry.view<transform, sprite>();
@@ -274,15 +270,50 @@ public:
 
         return {};
     }
+
+    void save(std::ostream& out)
+    {
+        nlohmann::json val;
+
+        val["test"] = 42;
+
+        out << val.dump(4);
+    }
 };
 
-extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api)
+namespace
 {
-    auto foo = new MyGame(api);
+    MyGame* foo;
+}
+
+extern "C" __declspec(dllexport) void plugin_fix_runtime(entt::locator<entt::meta_ctx>::node_type handle)
+{
+    entt::locator<entt::meta_ctx>::reset(handle);
+}
+
+extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
+{
+    foo = new MyGame(api);
+
+    if (reload)
+    {
+        std::ofstream file;
+        file.open("save.json");
+
+        auto existing_game = (MyGame*)api.first("game");
+        existing_game->save(file);
+
+
+        foo->registry = std::move(existing_game->registry);
+        foo->lastTime = existing_game->lastTime;
+        foo->accTime = existing_game->accTime;
+    }
+
     api.add("game", foo);
 }
 
-extern "C" __declspec(dllexport) void plugin_unload()
+extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)
 {
-
+    api.remove(foo);
+    delete foo;
 }

@@ -4,8 +4,14 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 add_library(foundation STATIC
-    code/foundation/foundation.ixx)
-target_link_libraries(foundation PUBLIC SDL3::SDL3)
+    code/foundation/foundation.ixx
+    code/foundation/global_exception_handler.ixx
+    code/foundation/print.ixx
+    code/foundation/math.ixx
+    code/foundation/plugin_manager.ixx
+    code/foundation/api_registry.ixx
+    code/foundation/FileWatch.hpp)
+target_link_libraries(foundation PUBLIC SDL3::SDL3 EnTT::EnTT)
 target_compile_options(foundation PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
 
 
@@ -24,15 +30,13 @@ target_compile_options(plugin_sprite_manager PRIVATE /source-charset:utf-8 /exec
 
 add_library(plugin_game
     code/game/plugin_game.cpp)
-target_link_libraries(plugin_game PRIVATE foundation EnTT::EnTT)
+target_link_libraries(plugin_game PRIVATE foundation nlohmann_json::nlohmann_json)
 target_compile_options(plugin_game PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
 
 
 
 add_executable(flappy
-    code/main.cpp
-    code/FileWatch.hpp
-    )
+    code/main.cpp)
 
 target_compile_definitions(flappy PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_options(flappy PRIVATE "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")

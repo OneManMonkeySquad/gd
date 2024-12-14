@@ -10,6 +10,8 @@ public:
 
     std::expected<void, foundation::error> init(int width, int height, const char* title) override
     {
+        foundation::println("MyEngine::init 2");
+
         if (!SDL_Init(SDL_INIT_VIDEO))
             return std::unexpected(foundation::error{ .message = SDL_GetError() });
 
@@ -31,8 +33,6 @@ public:
         SDL_Quit();
     }
 
-
-
     SDL_Window* window() override
     {
         return _window;
@@ -43,12 +43,19 @@ public:
     }
 } engine;
 
-extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api)
+extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
 {
+    if (reload)
+    {
+        auto existing_engine = (MyEngine*)api.first("engine");
+        engine._window = existing_engine->_window;
+        engine._renderer = existing_engine->_renderer;
+    }
+
     api.add("engine", &engine);
 }
 
-extern "C" __declspec(dllexport) void plugin_unload()
+extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)
 {
-
+    api.remove(&engine);
 }

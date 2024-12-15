@@ -17,7 +17,7 @@ public:
 
     std::expected<foundation::texture_handle, foundation::error> load_sprite(std::string path) override
     {
-        auto engine = (foundation::IEngine*)api.first("engine");
+        auto engine = api.get<foundation::IEngine>();
 
         // lookup cached
         for (size_t i = 0; i < texturePaths.size(); ++i)
@@ -61,7 +61,7 @@ namespace
 extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
 {
     foo = new MySpriteManager(api);
-    api.add("sprite_manager", foo);
+    api.set<foundation::ISpriteManager>(foo);
 }
 
 extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)

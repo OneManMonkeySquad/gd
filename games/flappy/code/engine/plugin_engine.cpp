@@ -47,12 +47,12 @@ extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api,
 {
     if (reload)
     {
-        auto existing_engine = (MyEngine*)api.first("engine");
+        auto existing_engine = (MyEngine*)api.get<foundation::IEngine>().raw_ptr();
         engine._window = existing_engine->_window;
         engine._renderer = existing_engine->_renderer;
     }
 
-    api.add("engine", &engine);
+    api.set<foundation::IEngine>(&engine);
 }
 
 extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)

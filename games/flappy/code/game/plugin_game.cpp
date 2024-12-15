@@ -57,7 +57,7 @@ public:
 
     void start() override
     {
-        auto engine = (foundation::IEngine*)api.first("engine");
+        auto engine = api.get<foundation::IEngine>();
         engine->init(288, 512, "Flappy");
 
         auto& ctx = registry.ctx();
@@ -91,14 +91,14 @@ public:
 
     void exit() override
     {
-        auto engine = (foundation::IEngine*)api.first("engine");
+        auto engine = api.get<foundation::IEngine>();
         engine->deinit();
     }
 
     std::expected<update_result, foundation::error> game_fixed_update(entt::registry& registry)
     {
-        auto engine = (foundation::IEngine*)api.first("engine");
-        auto sprite_manager = (foundation::ISpriteManager*)api.first("sprite_manager");
+        auto engine = api.get<foundation::IEngine>();
+        auto sprite_manager = api.get<foundation::ISpriteManager>();
 
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
@@ -209,8 +209,8 @@ public:
 
     std::expected<void, foundation::error> game_render(const entt::registry& registry)
     {
-        auto engine = (foundation::IEngine*)api.first("engine");
-        auto sprite_manager = (foundation::ISpriteManager*)api.first("sprite_manager");
+        auto engine = api.get<foundation::IEngine>();
+        auto sprite_manager = api.get<foundation::ISpriteManager>();
 
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
@@ -290,10 +290,12 @@ extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api,
 
     if (reload)
     {
-        auto existing_game = (MyGame*)api.first("game");
+        auto existing_game = (MyGame*)api.get<foundation::IGame>().raw_ptr();
+
+        foo->registry = std::move(existing_game->registry);
     }
 
-    api.add("game", foo);
+    api.set<foundation::IGame>(foo);
 }
 
 extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)

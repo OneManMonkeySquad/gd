@@ -60,9 +60,8 @@ namespace foundation
             temp_pdb_path.replace_extension(".pdb");
             foundation::println("   Temp pdb path '{}'", temp_pdb_path.string());
 
-            if (!::CopyFileW(pdbPath.wstring().c_str(), temp_pdb_path.wstring().c_str(), false))
-                throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
-
+            // note: pdb might be missing, ignore error
+            if (::CopyFileW(pdbPath.wstring().c_str(), temp_pdb_path.wstring().c_str(), false))
             {
                 std::string origPdb;
                 cr_pdb_replace(temp_plugin_path.string(), temp_plugin_path.filename().replace_extension(".pdb").string(), origPdb);
@@ -115,6 +114,9 @@ namespace foundation
             return is_plugin;
         }
 
+        /// <summary>
+        /// Search and load found plugins. Also, start watching directory for hot-reload.
+        /// </summary>
         void init()
         {
             watcher = std::make_unique<filewatch::FileWatch<std::string>>(SDL_GetBasePath(),
@@ -188,8 +190,8 @@ namespace foundation
                 if (!::DeleteFileW(entry.temp_dll_path.wstring().c_str()))
                     throw std::exception();
 
-                if (!::DeleteFileW(entry.temp_pdb_path.wstring().c_str()))
-                    throw std::exception();
+                // note: pdb might be missing, ignore error
+                (void)::DeleteFileW(entry.temp_pdb_path.wstring().c_str());
             }
 
             foundation::println("Plugins successfully unloaded");

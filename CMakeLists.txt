@@ -10,7 +10,17 @@ add_subdirectory(deps/SDL3 EXCLUDE_FROM_ALL)
 add_subdirectory(deps/SDL3_image EXCLUDE_FROM_ALL)
 add_subdirectory(deps/entt EXCLUDE_FROM_ALL)
 add_subdirectory(deps/json EXCLUDE_FROM_ALL)
+add_subdirectory(engine)
 add_subdirectory(games/flappy)
+
+set_target_properties(SDL3-shared
+    PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+)
+set_target_properties(SDL3_image-shared
+    PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+)
 
 set_target_properties(SDL3-shared PROPERTIES FOLDER "Deps")
 set_target_properties(SDL_uclibc PROPERTIES FOLDER "Deps")

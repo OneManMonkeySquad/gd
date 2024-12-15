@@ -3,31 +3,6 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 
-add_library(foundation STATIC
-    code/foundation/foundation.ixx
-    code/foundation/global_exception_handler.ixx
-    code/foundation/print.ixx
-    code/foundation/math.ixx
-    code/foundation/plugin_manager.ixx
-    code/foundation/api_registry.ixx
-    code/foundation/FileWatch.hpp)
-target_link_libraries(foundation PUBLIC SDL3::SDL3 EnTT::EnTT)
-target_compile_options(foundation PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
-
-
-
-add_library(plugin_engine
-    code/engine/plugin_engine.cpp)
-target_link_libraries(plugin_engine PRIVATE foundation)
-target_compile_options(plugin_engine PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
-
-
-add_library(plugin_sprite_manager
-    code/sprite_manager/plugin_sprite_manager.cpp)
-target_link_libraries(plugin_sprite_manager PRIVATE foundation SDL3_image::SDL3_image)
-target_compile_options(plugin_sprite_manager PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
-
-
 add_library(plugin_game
     code/game/plugin_game.cpp)
 target_link_libraries(plugin_game PRIVATE foundation nlohmann_json::nlohmann_json)
@@ -44,11 +19,16 @@ target_compile_options(flappy PRIVATE /source-charset:utf-8 /execution-charset:u
 
 target_link_libraries(flappy
     PRIVATE foundation)
+set_target_properties(flappy
+    PROPERTIES
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+)
 
 add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
-    -E copy_if_different "$<TARGET_FILE:SDL3::SDL3>" $<TARGET_FILE_DIR:flappy>)
+    -E copy_if_different "$<TARGET_FILE:plugin_engine>" "$<TARGET_PDB_FILE:plugin_engine>" $<TARGET_FILE_DIR:flappy>)
 add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
-    -E copy_if_different "$<TARGET_FILE:SDL3_image::SDL3_image>" $<TARGET_FILE_DIR:flappy>)
-
+    -E copy_if_different "$<TARGET_FILE:plugin_sprite_manager>" "$<TARGET_PDB_FILE:plugin_sprite_manager>" $<TARGET_FILE_DIR:flappy>)
+add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
+    -E copy_if_different "$<TARGET_FILE:plugin_game>" "$<TARGET_PDB_FILE:plugin_game>" $<TARGET_FILE_DIR:flappy>)
 add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
     -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:flappy>/assets)

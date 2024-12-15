@@ -21,7 +21,7 @@ target_link_libraries(flappy
     PRIVATE foundation)
 set_target_properties(flappy
     PROPERTIES
-        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/$<CONFIG>/bin/flappy
 )
 
 add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
@@ -30,5 +30,9 @@ add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
     -E copy_if_different "$<TARGET_FILE:plugin_sprite_manager>" "$<TARGET_PDB_FILE:plugin_sprite_manager>" $<TARGET_FILE_DIR:flappy>)
 add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
     -E copy_if_different "$<TARGET_FILE:plugin_game>" "$<TARGET_PDB_FILE:plugin_game>" $<TARGET_FILE_DIR:flappy>)
+add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
+    -E copy_if_different "$<TARGET_FILE:SDL3::SDL3>" $<TARGET_FILE_DIR:flappy>)
+add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
+    -E copy_if_different "$<TARGET_FILE:SDL3_image::SDL3_image>" $<TARGET_FILE_DIR:flappy>)
 add_custom_command(TARGET flappy POST_BUILD COMMAND ${CMAKE_COMMAND}
     -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets $<TARGET_FILE_DIR:flappy>/assets)

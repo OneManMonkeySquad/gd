@@ -1,0 +1,4 @@
+git clone https://github.com/skypjack/entt
+git clone https://github.com/libsdl-org/SDL SDL3
+git clone https://github.com/libsdl-org/SDL_image SDL3_image
+git clone https://github.com/nlohmann/json

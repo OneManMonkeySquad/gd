@@ -44,11 +44,11 @@ namespace foundation
 
         loaded_plugin load_plugin(fs::path plugin_path, bool is_reload)
         {
-            foundation::println("Loading plugin '{}'...", plugin_path.string());
+            foundation::println("Loading plugin '{}'...", plugin_path.filename().string());
 
             auto temp_plugin_path = plugin_path;
-            temp_plugin_path.replace_filename(std::format("_{}{}", std::rand(), temp_plugin_path.filename().string()));
-            foundation::println("   Temp path '{}'", temp_plugin_path.string());
+            temp_plugin_path.replace_filename(std::format("_{}_{}", std::rand(), temp_plugin_path.filename().string()));
+            foundation::println("   Temp path '{}'", temp_plugin_path.filename().string());
 
             if (!::CopyFileW(plugin_path.wstring().c_str(), temp_plugin_path.wstring().c_str(), false))
                 throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
@@ -58,7 +58,7 @@ namespace foundation
 
             auto temp_pdb_path = temp_plugin_path;
             temp_pdb_path.replace_extension(".pdb");
-            foundation::println("   Temp pdb path '{}'", temp_pdb_path.string());
+            foundation::println("   Temp pdb path '{}'", temp_pdb_path.filename().string());
 
             // note: pdb might be missing, ignore error
             if (::CopyFileW(pdbPath.wstring().c_str(), temp_pdb_path.wstring().c_str(), false))
@@ -152,7 +152,7 @@ namespace foundation
                     if (!plugin_modules.contains(dirty_file_path))
                         continue;
 
-                    foundation::println("Plugin changed '{}'", dirty_file_path.string());
+                    foundation::println("Plugin changed '{}'", dirty_file_path.filename().string());
 
                     try
                     {
@@ -183,7 +183,7 @@ namespace foundation
             // unload all modules
             for (auto [path, entry] : plugin_modules)
             {
-                foundation::println("Unloading plugin '{}'...", path.string());
+                foundation::println("Unloading plugin '{}'...", path.filename().string());
 
                 unload_plugin(entry, false);
 

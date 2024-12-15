@@ -44,8 +44,6 @@ namespace foundation
             {
                 if (pair.first == name)
                 {
-                    foundation::println("patched existing pointer");
-
                     pair.second = api;
                     return;
                 }
@@ -81,7 +79,6 @@ namespace foundation
                     return (T**)&pair.second;
             }
 
-            foundation::println("created dummy pointer");
             auto& ref = _foo.emplace_back(name, nullptr);
             return (T**)&ref.second;
         }

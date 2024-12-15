@@ -19,7 +19,6 @@ int main()
     foundation::plugin_manager plugin_manager{ api_registry };
     plugin_manager.init();
 
-    //
     foundation::println("*-*-* RUN *-*-*");
 
     {

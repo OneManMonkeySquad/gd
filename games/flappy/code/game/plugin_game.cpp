@@ -4,6 +4,8 @@ import <entt/entt.hpp>;
 import <nlohmann/json.hpp>;
 import std;
 
+namespace fs = std::filesystem;
+
 enum class game_state {
     none,
     running,
@@ -154,7 +156,7 @@ public:
             auto birdView = registry.view<bird, velocity>();
             for (auto entity : birdView) {
                 auto [velocity] = birdView.get(entity);
-                velocity.linear.y -= 0.02f;
+                velocity.linear.y -= 0.2f;
             }
 
             registry.view<velocity, transform>().each([](auto& velocity, auto& position) {
@@ -270,15 +272,6 @@ public:
 
         return {};
     }
-
-    void save(std::ostream& out)
-    {
-        nlohmann::json val;
-
-        val["test"] = 42;
-
-        out << val.dump(4);
-    }
 };
 
 namespace
@@ -297,16 +290,7 @@ extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api,
 
     if (reload)
     {
-        std::ofstream file;
-        file.open("save.json");
-
         auto existing_game = (MyGame*)api.first("game");
-        existing_game->save(file);
-
-
-        foo->registry = std::move(existing_game->registry);
-        foo->lastTime = existing_game->lastTime;
-        foo->accTime = existing_game->accTime;
     }
 
     api.add("game", foo);

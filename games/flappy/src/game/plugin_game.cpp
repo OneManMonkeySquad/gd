@@ -17,20 +17,20 @@ struct game {
     float death_time;
 };
 
-struct bird {};
-struct pipe {};
+struct bird_t {};
+struct pipe_t {};
 
-struct transform {
+struct transform_t {
     foundation::float2 value;
     float angle;
 };
 
-struct velocity {
+struct velocity_t {
     foundation::float2 linear;
 };
 
-struct sprite {
-    foundation::texture_handle texture;
+struct sprite_t {
+    foundation::texture_handle_t texture;
     foundation::float2 size;
 };
 
@@ -43,28 +43,26 @@ enum update_result {
 
 const auto fixed_time_step = 1.f / 30.f;
 
-
-
-class MyGame : public foundation::IGame
+namespace
 {
-public:
-    foundation::api_registry& api;
+    foundation::engine_t* engine;
+    foundation::sprite_manager_t* sprite_manager;
     entt::registry registry;
     Uint64 lastTime = 0;
     float accTime = 0;
 
-    MyGame(foundation::api_registry& api) : api(api) {}
+    std::expected<update_result, foundation::error_t> game_fixed_update(entt::registry& registry);
+    std::expected<void, foundation::error_t> game_render(const entt::registry& registry);
 
-    void start() override
+    void start()
     {
-        auto engine = api.get<foundation::IEngine>();
         engine->init(288, 512, "Flappy");
 
         auto& ctx = registry.ctx();
         ctx.emplace<::game>();
     }
 
-    bool run_once() override
+    bool run_once()
     {
         Uint64 time = SDL_GetPerformanceCounter();
         float secondsElapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
@@ -89,22 +87,18 @@ public:
         return true;
     }
 
-    void exit() override
+    void exit()
     {
-        auto engine = api.get<foundation::IEngine>();
         engine->deinit();
     }
 
-    std::expected<update_result, foundation::error> game_fixed_update(entt::registry& registry)
+    std::expected<update_result, foundation::error_t> game_fixed_update(entt::registry& registry)
     {
-        auto engine = api.get<foundation::IEngine>();
-        auto sprite_manager = api.get<foundation::ISpriteManager>();
-
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
 
         // handle events
-        bool birdFlap = false;
+        bool bird_flap = false;
 
         SDL_Event event;
         while (SDL_PollEvent(&event)) {
@@ -118,7 +112,7 @@ public:
 
                 if (event.key.scancode == SDL_SCANCODE_SPACE)
                 {
-                    birdFlap = true;
+                    bird_flap = true;
                 }
             }
         }
@@ -129,43 +123,43 @@ public:
             auto pipeTexture = sprite_manager->load_sprite("sprites\\pipe-red.png");
 
             auto birdEntity = registry.create();
-            registry.emplace<transform>(birdEntity, foundation::float2{ 288 * 0.5f, 512 * 0.5f });
-            registry.emplace<sprite>(birdEntity, *birdTexture, foundation::float2{ 64,64 });
-            registry.emplace<velocity>(birdEntity, foundation::float2{ 0, 0 });
-            registry.emplace<bird>(birdEntity);
+            registry.emplace<transform_t>(birdEntity, foundation::float2{ 288 * 0.5f, 512 * 0.5f });
+            registry.emplace<sprite_t>(birdEntity, *birdTexture, foundation::float2{ 64,64 });
+            registry.emplace<velocity_t>(birdEntity, foundation::float2{ 0, 0 });
+            registry.emplace<bird_t>(birdEntity);
 
             auto pipeEntity = registry.create();
-            registry.emplace<transform>(pipeEntity, foundation::float2{ 70.f, 220 * 0.5f });
-            registry.emplace<sprite>(pipeEntity, *pipeTexture, foundation::float2{ 64,220 });
-            registry.emplace<pipe>(pipeEntity);
+            registry.emplace<transform_t>(pipeEntity, foundation::float2{ 70.f, 220 * 0.5f });
+            registry.emplace<sprite_t>(pipeEntity, *pipeTexture, foundation::float2{ 64,220 });
+            registry.emplace<pipe_t>(pipeEntity);
 
             auto pipe2Entity = registry.create();
-            registry.emplace<transform>(pipe2Entity, foundation::float2{ 70.f, 512 - 220 * 0.5f }, 180.f);
-            registry.emplace<sprite>(pipe2Entity, *pipeTexture, foundation::float2{ 64,220 });
-            registry.emplace<pipe>(pipe2Entity);
+            registry.emplace<transform_t>(pipe2Entity, foundation::float2{ 70.f, 512 - 220 * 0.5f }, 180.f);
+            registry.emplace<sprite_t>(pipe2Entity, *pipeTexture, foundation::float2{ 64,220 });
+            registry.emplace<pipe_t>(pipe2Entity);
 
             game.state = game_state::running;
         }
         else if (game.state == game_state::running)
         {
             // simulate
-            registry.view<bird, velocity>().each([&](auto& velo) {
-                velo.linear.y += birdFlap ? 4 : 0;
+            registry.view<bird_t, velocity_t>().each([&](auto& velo) {
+                velo.linear.y += bird_flap ? 4 : 0;
                 });
 
-            auto birdView = registry.view<bird, velocity>();
+            auto birdView = registry.view<bird_t, velocity_t>();
             for (auto entity : birdView) {
                 auto [velocity] = birdView.get(entity);
                 velocity.linear.y -= 0.2f;
             }
 
-            registry.view<velocity, transform>().each([](auto& velocity, auto& position) {
+            registry.view<velocity_t, transform_t>().each([](auto& velocity, auto& position) {
                 position.value += velocity.linear;
                 });
 
             bool lost = false;
             foundation::float2 birdPos;
-            registry.view<bird, transform>().each([&](auto& tf) {
+            registry.view<bird_t, transform_t>().each([&](auto& tf) {
                 birdPos = tf.value;
                 if (tf.value.y < 0 || tf.value.y > 500)
                 {
@@ -173,7 +167,7 @@ public:
                 }
                 });
 
-            registry.view<pipe, transform>().each([&](auto& tf) {
+            registry.view<pipe_t, transform_t>().each([&](auto& tf) {
                 tf.value.x -= 5;
                 if (tf.value.x < -60)
                 {
@@ -207,17 +201,14 @@ public:
         return update_result::keep_running;
     }
 
-    std::expected<void, foundation::error> game_render(const entt::registry& registry)
+    std::expected<void, foundation::error_t> game_render(const entt::registry& registry)
     {
-        auto engine = api.get<foundation::IEngine>();
-        auto sprite_manager = api.get<foundation::ISpriteManager>();
-
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
 
         int windowHeight;
         if (!SDL_GetWindowSize(engine->window(), nullptr, &windowHeight))
-            return std::unexpected(foundation::error{ .message = SDL_GetError() });
+            return std::unexpected(foundation::error_t{ .message = SDL_GetError() });
 
         // clear
         SDL_SetRenderDrawColor(engine->renderer(), 80, 80, 80, SDL_ALPHA_OPAQUE);
@@ -240,7 +231,7 @@ public:
         // SDL_RenderDebugText(engine->renderer(), 5, 5, std::to_string((int)game.state).c_str());
 
         // draw sprites
-        auto rendableView = registry.view<transform, sprite>();
+        auto rendableView = registry.view<transform_t, sprite_t>();
         rendableView.each([&](auto& pos, auto& sprite) {
             SDL_FRect dst_rect;
             dst_rect.x = pos.value.x - sprite.size.x * 0.5f;
@@ -268,15 +259,10 @@ public:
 
         // present
         if (!SDL_RenderPresent(engine->renderer()))
-            return std::unexpected(foundation::error{ .message = SDL_GetError() });
+            return std::unexpected(foundation::error_t{ .message = SDL_GetError() });
 
         return {};
     }
-};
-
-namespace
-{
-    MyGame* foo;
 }
 
 extern "C" __declspec(dllexport) void plugin_fix_runtime(entt::locator<entt::meta_ctx>::node_type handle)
@@ -286,20 +272,26 @@ extern "C" __declspec(dllexport) void plugin_fix_runtime(entt::locator<entt::met
 
 extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
 {
-    foo = new MyGame(api);
+
+
+    engine = api.get<foundation::engine_t>();
+    sprite_manager = api.get<foundation::sprite_manager_t>();
 
     if (reload)
     {
-        auto existing_game = (MyGame*)api.get<foundation::IGame>().raw_ptr();
-
-        foo->registry = std::move(existing_game->registry);
+        // foo->registry = std::move(existing_game->registry);
     }
 
-    api.set<foundation::IGame>(foo);
+    foundation::game_t game;
+    game.start = &start;
+    game.run_once = &run_once;
+    game.exit = &exit;
+
+    api.set(game);
 }
 
 extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)
 {
-    api.remove(foo);
-    delete foo;
+    // api.remove(foo);
+    // delete foo;
 }

@@ -10,33 +10,13 @@ import :print;
 
 namespace foundation
 {
-    export template<typename T>
-        class api
-    {
-    public:
-        api(T** ptr) : _ptr(ptr) {}
-
-        [[nodiscard]] constexpr T* raw_ptr() noexcept
-        {
-            return *_ptr;
-        }
-
-        [[nodiscard]] constexpr T* operator->() noexcept
-        {
-            return *_ptr;
-        }
-
-    private:
-        T** _ptr;
-    };
-
     export struct api_registry
     {
         // note: this needs to be a list for api pointers to have a fixed address
         std::list<std::pair<entt::id_type, void*>> _foo;
 
         template<typename T>
-        void set(void* api)
+        void set(const T& api)
         {
             auto name = entt::type_id<T>().hash();
 
@@ -44,43 +24,43 @@ namespace foundation
             {
                 if (pair.first == name)
                 {
-                    pair.second = api;
+                    memcpy(pair.second, &api, sizeof(T));
                     return;
                 }
             }
 
-            _foo.push_back(std::make_pair(name, api));
+            _foo.push_back(std::make_pair(name, new T(api)));
         }
 
         void remove(void* api)
         {
-            for (auto it = std::begin(_foo); it != std::end(_foo); ++it)
+            for (auto& pair : _foo)
             {
-                if (it->second == api)
+                if (pair.second == api)
                 {
-                    _foo.erase(it);
-                    break;
+                    pair.second = nullptr;
+                    return;
                 }
             }
         }
 
         /// <summary>
-        /// Get api pointer. May return an invalid pointer that gets
+        /// Get api pointer. May return an invalid pointer that is
         /// patched later when the corresponding api is loaded.
         /// </summary>
         template<typename T>
-        api<T> get()
+        T* get()
         {
             auto name = entt::type_id<T>().hash();
 
             for (auto& pair : _foo)
             {
                 if (pair.first == name)
-                    return (T**)&pair.second;
+                    return (T*)pair.second;
             }
 
-            auto& ref = _foo.emplace_back(name, nullptr);
-            return (T**)&ref.second;
+            auto& ref = _foo.emplace_back(name, new T());
+            return (T*)ref.second;
         }
     };
 }

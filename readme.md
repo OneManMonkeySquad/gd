@@ -1,0 +1,1 @@
+https://ruby0x1.github.io/machinery_blog_archive/

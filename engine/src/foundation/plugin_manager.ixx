@@ -20,14 +20,14 @@ namespace foundation
         const std::string& pdbname,
         std::string& orig_pdb);
 
-    export struct plugin_manager
+    export struct plugin_manager_t
     {
         using plugin_t = HMODULE;
         using plugin_fix_runtime_t = void(*)(entt::locator<entt::meta_ctx>::node_type foo);
         using plugin_load_t = void(*)(foundation::api_registry&, bool reload);
         using plugin_unload_t = void(*)(foundation::api_registry&, bool reload);
 
-        struct loaded_plugin
+        struct loaded_plugin_t
         {
             plugin_t handle;
             fs::path temp_dll_path;
@@ -35,14 +35,14 @@ namespace foundation
         };
 
         foundation::api_registry& api_registry;
-        std::unordered_map<fs::path, loaded_plugin> plugin_modules;
+        std::unordered_map<fs::path, loaded_plugin_t> plugin_modules;
         std::mutex dirty_files_lock;
         std::vector<fs::path> dirty_files;
         std::unique_ptr<filewatch::FileWatch<std::string>> watcher;
 
-        plugin_manager(foundation::api_registry& api_registry) : api_registry(api_registry) {}
+        plugin_manager_t(foundation::api_registry& api_registry) : api_registry(api_registry) {}
 
-        loaded_plugin load_plugin(fs::path plugin_path, bool is_reload)
+        loaded_plugin_t load_plugin(fs::path plugin_path, bool is_reload)
         {
             foundation::println("Loading plugin '{}'...", plugin_path.filename().string());
 
@@ -82,14 +82,14 @@ namespace foundation
             auto plugin_load = (plugin_load_t)::GetProcAddress(plugin, "plugin_load");
             plugin_load(api_registry, is_reload);
 
-            loaded_plugin entry;
+            loaded_plugin_t entry;
             entry.handle = plugin;
             entry.temp_dll_path = temp_plugin_path;
             entry.temp_pdb_path = temp_pdb_path;
             return entry;
         }
 
-        void unload_plugin(loaded_plugin plugin, bool is_reload)
+        void unload_plugin(loaded_plugin_t plugin, bool is_reload)
         {
             auto plugin_unload = (plugin_unload_t)::GetProcAddress(plugin.handle, "plugin_unload");
             plugin_unload(api_registry, is_reload);
@@ -128,7 +128,7 @@ namespace foundation
                 if (!is_plugin_path(dir_entry.path()))
                     continue;
 
-                loaded_plugin entry = load_plugin(dir_entry.path(), false);
+                loaded_plugin_t entry = load_plugin(dir_entry.path(), false);
                 plugin_modules.emplace(dir_entry.path(), entry);
             }
 
@@ -187,8 +187,9 @@ namespace foundation
 
                 unload_plugin(entry, false);
 
-                if (!::DeleteFileW(entry.temp_dll_path.wstring().c_str()))
-                    throw std::exception();
+                // note: might fail if we are debugging
+                // #todo delete on next start
+                (void)::DeleteFileW(entry.temp_dll_path.wstring().c_str());
 
                 // note: pdb might be missing, ignore error
                 (void)::DeleteFileW(entry.temp_pdb_path.wstring().c_str());
@@ -269,8 +270,6 @@ namespace foundation
         return true;
     }
 
-#   define CR_WINDOWS_ConvertPath(_newpath, _path)     const std::string &_newpath = _path
-
     static char* cr_pdb_find(LPBYTE imageBase, PIMAGE_DEBUG_DIRECTORY debugDir) {
         // CR_ASSERT(debugDir && imageBase);
         LPBYTE debugInfo = imageBase + debugDir->PointerToRawData;
@@ -309,7 +308,7 @@ namespace foundation
     // https://github.com/fungos/cr/blob/master/cr.h
     bool cr_pdb_replace(const std::string& filename, const std::string& pdbname,
         std::string& orig_pdb) {
-        CR_WINDOWS_ConvertPath(_filename, filename);
+        const std::string& _filename = filename;
 
         HANDLE fp = nullptr;
         HANDLE filemap = nullptr;

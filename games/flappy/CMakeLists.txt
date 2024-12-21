@@ -18,6 +18,13 @@ target_link_options(flappy PRIVATE "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
 target_compile_options(flappy PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
 set_target_properties(flappy PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
 
+
 add_custom_command(
     TARGET flappy POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory ${CMAKE_CURRENT_SOURCE_DIR}/assets ${CMAKE_BINARY_DIR}/bin/$<CONFIG>/assets)
+add_custom_command(
+    TARGET flappy POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3::SDL3-shared> $<TARGET_PDB_FILE:SDL3-shared> ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
+add_custom_command(
+    TARGET flappy POST_BUILD
+    COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3_image::SDL3_image> $<TARGET_PDB_FILE:SDL3_image::SDL3_image> ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)

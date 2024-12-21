@@ -11,31 +11,27 @@ export import :math;
 export import :global_exception_handler;
 export import :print;
 export import :plugin_manager;
-export import :api_registry;
+export import :api_registry_t;
 
-namespace foundation
+namespace fd
 {
-    export enum class error_code {
-        unknown,
-    };
+    export using error_t = std::exception;
 
-    export struct error_t {
-        error_code code = error_code::unknown;
-        const char* message;
-    };
 
-    using window_t = void*;
+    export using window_t = void*;
 
-    export struct engine_t
+    export struct platform_t
     {
-        window_t(*create_window)(int width, int height, const char* title);
+        std::expected<void, fd::error_t>(*init)();
+        void (*exit)();
+
+        std::expected<window_t, fd::error_t>(*create_window)(int width, int height, const char* title);
         void(*destroy_window)(window_t window);
 
-        std::expected<void, error_t>(*init)(int width, int height, const char* title);
-        void (*deinit)();
-        SDL_Window* (*window)();
-        SDL_Renderer* (*renderer)();
+        SDL_Window* (*get_sdl_window)(window_t window);
+        SDL_Renderer* (*get_sdl_renderer)(window_t window);
     };
+
 
 
     export struct jobdecl_t
@@ -56,12 +52,12 @@ namespace foundation
     };
 
 
-    export using texture_handle_t = size_t;
+    export using texture_t = std::uint64_t;
 
     export struct sprite_manager_t
     {
-        std::expected<texture_handle_t, error_t>(*load_sprite)(std::string path);
-        SDL_Texture* (*texture)(texture_handle_t handle);
+        std::expected<texture_t, error_t>(*load_sprite)(std::string path, window_t window);
+        SDL_Texture* (*texture)(texture_t handle);
     };
 
 

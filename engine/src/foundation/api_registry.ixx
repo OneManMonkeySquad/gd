@@ -2,15 +2,15 @@ module;
 
 #include <Windows.h>
 
-export module foundation:api_registry;
+export module foundation:api_registry_t;
 
 import std;
 import <entt/entt.hpp>;
 import :print;
 
-namespace foundation
+namespace fd
 {
-    export struct api_registry
+    export struct api_registry_t
     {
         // note: this needs to be a list for api pointers to have a fixed address
         std::list<std::pair<entt::id_type, void*>> _foo;

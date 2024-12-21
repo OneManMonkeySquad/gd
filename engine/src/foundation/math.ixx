@@ -1,6 +1,6 @@
 export module foundation:math;
 
-namespace foundation
+namespace fd
 {
     export struct float2 {
         float x;

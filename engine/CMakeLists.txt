@@ -5,14 +5,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 add_library(foundation STATIC
     src/foundation/foundation.ixx
     src/foundation/global_exception_handler.ixx
+    src/foundation/plugin_manager.ixx
     src/foundation/print.ixx
     src/foundation/math.ixx
-    src/foundation/plugin_manager.ixx
     src/foundation/api_registry.ixx
     src/foundation/FileWatch.hpp)
-target_link_libraries(foundation PUBLIC SDL3::SDL3 EnTT::EnTT)
+target_link_libraries(foundation PUBLIC SDL3::SDL3-shared EnTT::EnTT)
 target_compile_options(foundation PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
-
 
 
 add_library(plugin_engine
@@ -23,7 +22,8 @@ set_target_properties(plugin_engine PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE
 
 
 add_library(plugin_job_system
-    src/job_system/plugin_job_system.cpp)
+    src/job_system/plugin_job_system.cpp
+    src/job_system/mpmc_bounded_queue.h)
 target_link_libraries(plugin_job_system PRIVATE foundation)
 target_compile_options(plugin_job_system PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
 set_target_properties(plugin_job_system PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")

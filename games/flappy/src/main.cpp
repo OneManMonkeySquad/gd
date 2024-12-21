@@ -1,111 +1,80 @@
+#include "SDL3\SDL_filesystem.h"
 
 import <windows.h>;
 import foundation;
 import std;
 
+namespace fs = std::filesystem;
+
 namespace
 {
-    foundation::api_registry api_registry;
+    fd::api_registry_t api_registry;
 }
 
-void job1_B_X(void* data)
+void run()
 {
-    foundation::println("       job1_B_X");
-}
+    fd::install_global_exception_handler();
 
-void job1_B_Y(void* data)
-{
-    foundation::println("       job1_B_Y");
-}
+    fd::clear_log();
 
-void job1_B_Z(void* data)
-{
-    foundation::println("       job1_B_Z");
-}
-
-void job1_A(void* data)
-{
-    foundation::println("   job1_A");
-}
-
-void job1_B(void* data)
-{
-    foundation::println("   job1_B");
-
-    auto js = api_registry.get<foundation::job_system_t>();
-    auto handle = js->run_jobs({ foundation::jobdecl_t{ &job1_B_X }, foundation::jobdecl_t{ &job1_B_Y }, foundation::jobdecl_t{ &job1_B_Z } });
-    js->wait_for_counter(handle, 0);
-}
-
-void job1(void* data)
-{
-    foundation::println("job1");
-
-    auto js = api_registry.get<foundation::job_system_t>();
-    auto handle = js->run_jobs({ foundation::jobdecl_t{ &job1_A }, foundation::jobdecl_t{ &job1_B } });
-    js->wait_for_counter(handle, 0);
-}
-
-void job2(void* data)
-{
-    foundation::println("job2");
-}
-
-void job3(void* data)
-{
-    foundation::println("job3");
-}
-
-int main()
-{
-    foundation::install_global_exception_handler();
-
-    foundation::clear_log();
-
-    foundation::println("");
-    foundation::println("*-*-* INIT *-*-*");
+    fd::println("");
+    fd::println("*-*-* INIT *-*-*");
 
 #ifdef _WIN32
     std::setlocale(2, ".UTF8");
 #endif
 
-    auto game = api_registry.get<foundation::game_t>();
+    auto game = api_registry.get<fd::game_t>();
+    auto platform = api_registry.get<fd::platform_t>();
 
-    foundation::plugin_manager_t plugin_manager{ api_registry };
+    fd::plugin_manager_t plugin_manager{ api_registry };
     plugin_manager.init();
 
-    foundation::println("");
-    foundation::println("*-*-* RUN *-*-*");
+    fd::println("");
+    fd::println("*-*-* RUN *-*-*");
 
-    auto js = api_registry.get<foundation::job_system_t>();
+    auto js = api_registry.get<fd::job_system_t>();
     js->init();
 
-    {
-        auto handle = js->run_jobs({ foundation::jobdecl_t{ &job1 }, foundation::jobdecl_t{ &job2 }, foundation::jobdecl_t{ &job3 } });
-        js->wait_for_counter(handle, 0);
-
-        foundation::println("main after wait");
-    }
-
+    platform->init();
 
     game->start();
 
+    bool once = false;
     while (true)
     {
         if (!game->run_once())
             break;
 
         plugin_manager.update();
+        if (!once)
+        {
+            once = true;
+            plugin_manager.dirty_file_manually(fs::path{ SDL_GetBasePath() } / "plugin_game.dll");
+        }
     }
 
-    foundation::println("");
-    foundation::println("*-*-* EXIT *-*-*");
+    fd::println("");
+    fd::println("*-*-* EXIT *-*-*");
 
     game->exit();
+
+    platform->exit();
 
     js->deinit();
 
     plugin_manager.exit();
+}
 
+int main()
+{
+    try
+    {
+        run();
+    }
+    catch (const std::exception& e)
+    {
+        fd::println(e.what());
+    }
     return 0;
 }

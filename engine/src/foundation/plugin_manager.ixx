@@ -10,22 +10,24 @@ import <entt/entt.hpp>;
 import "FileWatch.hpp";
 
 import :print;
-import :api_registry;
+import :api_registry_t;
 
 namespace fs = std::filesystem;
 
-namespace foundation
+namespace fd
 {
     bool cr_pdb_replace(const std::string& filename,
         const std::string& pdbname,
         std::string& orig_pdb);
 
+
+
     export struct plugin_manager_t
     {
         using plugin_t = HMODULE;
         using plugin_fix_runtime_t = void(*)(entt::locator<entt::meta_ctx>::node_type foo);
-        using plugin_load_t = void(*)(foundation::api_registry&, bool reload);
-        using plugin_unload_t = void(*)(foundation::api_registry&, bool reload);
+        using plugin_load_t = void(*)(fd::api_registry_t&, bool reload, void* old_dll);
+        using plugin_unload_t = void(*)(fd::api_registry_t&, bool reload);
 
         struct loaded_plugin_t
         {
@@ -34,21 +36,21 @@ namespace foundation
             fs::path temp_pdb_path;
         };
 
-        foundation::api_registry& api_registry;
+        fd::api_registry_t& api_registry;
         std::unordered_map<fs::path, loaded_plugin_t> plugin_modules;
         std::mutex dirty_files_lock;
         std::vector<fs::path> dirty_files;
         std::unique_ptr<filewatch::FileWatch<std::string>> watcher;
 
-        plugin_manager_t(foundation::api_registry& api_registry) : api_registry(api_registry) {}
+        plugin_manager_t(fd::api_registry_t& api_registry) : api_registry(api_registry) {}
 
-        loaded_plugin_t load_plugin(fs::path plugin_path, bool is_reload)
+        loaded_plugin_t load_plugin(fs::path plugin_path, bool is_reload, void* old_dll)
         {
-            foundation::println("Loading plugin '{}'...", plugin_path.filename().string());
+            fd::println("Loading plugin '{}'...", plugin_path.filename().string());
 
             auto temp_plugin_path = plugin_path;
             temp_plugin_path.replace_filename(std::format("_{}_{}", std::rand(), temp_plugin_path.filename().string()));
-            foundation::println("   Temp path '{}'", temp_plugin_path.filename().string());
+            fd::println("   Temp path '{}'", temp_plugin_path.filename().string());
 
             if (!::CopyFileW(plugin_path.wstring().c_str(), temp_plugin_path.wstring().c_str(), false))
                 throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
@@ -58,7 +60,7 @@ namespace foundation
 
             auto temp_pdb_path = temp_plugin_path;
             temp_pdb_path.replace_extension(".pdb");
-            foundation::println("   Temp pdb path '{}'", temp_pdb_path.filename().string());
+            fd::println("   Temp pdb path '{}'", temp_pdb_path.filename().string());
 
             // note: pdb might be missing, ignore error
             if (::CopyFileW(pdbPath.wstring().c_str(), temp_pdb_path.wstring().c_str(), false))
@@ -73,14 +75,14 @@ namespace foundation
 
             auto handle = entt::locator<entt::meta_ctx>::handle();
 
-            auto plugin_fix_runtime = (plugin_fix_runtime_t)::GetProcAddress(plugin, "plugin_fix_runtime");
+            auto plugin_fix_runtime = (plugin_fix_runtime_t)::GetProcAddress(plugin, "set_plugin_runtime");
             if (plugin_fix_runtime != nullptr)
             {
                 plugin_fix_runtime(handle);
             }
 
-            auto plugin_load = (plugin_load_t)::GetProcAddress(plugin, "plugin_load");
-            plugin_load(api_registry, is_reload);
+            auto plugin_load = (plugin_load_t)::GetProcAddress(plugin, "load_plugin");
+            plugin_load(api_registry, is_reload, old_dll);
 
             loaded_plugin_t entry;
             entry.handle = plugin;
@@ -91,7 +93,7 @@ namespace foundation
 
         void unload_plugin(loaded_plugin_t plugin, bool is_reload)
         {
-            auto plugin_unload = (plugin_unload_t)::GetProcAddress(plugin.handle, "plugin_unload");
+            auto plugin_unload = (plugin_unload_t)::GetProcAddress(plugin.handle, "unload_plugin");
             plugin_unload(api_registry, is_reload);
 
             ::FreeLibrary(plugin.handle);
@@ -102,9 +104,8 @@ namespace foundation
             if (event != filewatch::Event::modified)
                 return;
 
-            std::scoped_lock lock{ dirty_files_lock };
-            dirty_files.push_back(fs::path{ SDL_GetBasePath() } / path);
-            // foundation::println("{} {}", (fs::path{ SDL_GetBasePath() } / path).string(), filewatch::event_to_string(event));
+            dirty_file_manually(fs::path{ SDL_GetBasePath() } / path);
+            // fd::println("{} {}", (fs::path{ SDL_GetBasePath() } / path).string(), filewatch::event_to_string(event));
         }
 
         static bool is_plugin_path(fs::path path)
@@ -128,11 +129,17 @@ namespace foundation
                 if (!is_plugin_path(dir_entry.path()))
                     continue;
 
-                loaded_plugin_t entry = load_plugin(dir_entry.path(), false);
+                loaded_plugin_t entry = load_plugin(dir_entry.path(), false, nullptr);
                 plugin_modules.emplace(dir_entry.path(), entry);
             }
 
-            foundation::println("Plugins successfully loaded");
+            fd::println("Plugins successfully loaded");
+        }
+
+        void dirty_file_manually(fs::path absolute_file_path)
+        {
+            std::scoped_lock lock{ dirty_files_lock };
+            dirty_files.push_back(absolute_file_path);
         }
 
         void update()
@@ -152,25 +159,26 @@ namespace foundation
                     if (!plugin_modules.contains(dirty_file_path))
                         continue;
 
-                    foundation::println("Plugin changed '{}'", dirty_file_path.filename().string());
+                    fd::println("Plugin changed '{}'", dirty_file_path.filename().string());
 
                     try
                     {
-                        auto entry2 = load_plugin(dirty_file_path, true);
-
-                        foundation::println("   Unload old plugin");
-
                         auto loaded_entry = plugin_modules[dirty_file_path];
+
+                        auto entry2 = load_plugin(dirty_file_path, true, loaded_entry.handle);
+
+                        fd::println("   Unload old plugin");
+
                         unload_plugin(loaded_entry, true);
 
                         // update entry
                         plugin_modules[dirty_file_path] = entry2;
 
-                        foundation::println("Plugin reload successful");
+                        fd::println("Plugin reload successful");
                     }
                     catch (const std::exception& e)
                     {
-                        foundation::println("   Plugin reload failed: {}", e.what());
+                        fd::println("   Plugin reload failed: {}", e.what());
                     }
                 }
 
@@ -183,7 +191,7 @@ namespace foundation
             // unload all modules
             for (auto [path, entry] : plugin_modules)
             {
-                foundation::println("Unloading plugin '{}'...", path.filename().string());
+                fd::println("Unloading plugin '{}'...", path.filename().string());
 
                 unload_plugin(entry, false);
 
@@ -195,7 +203,7 @@ namespace foundation
                 (void)::DeleteFileW(entry.temp_pdb_path.wstring().c_str());
             }
 
-            foundation::println("Plugins successfully unloaded");
+            fd::println("Plugins successfully unloaded");
         }
     };
 

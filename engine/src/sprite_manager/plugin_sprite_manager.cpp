@@ -5,8 +5,16 @@ import std;
 
 namespace
 {
-    foundation::engine_t* engine;
-    foundation::job_system_t* job_system;
+    struct load_texture_data_t
+    {
+        fd::window_t window;
+        std::string path;
+
+        SDL_Texture* texture;
+    };
+
+    fd::platform_t* platform;
+    fd::job_system_t* job_system;
     std::vector<SDL_Texture*> textures;
     std::vector<std::string> texture_paths;
 
@@ -14,69 +22,66 @@ namespace
         return std::format("{}\\assets", SDL_GetBasePath());
     }
 
-    struct load_texture_data_t
-    {
-        std::string path;
-        SDL_Texture* texture;
-    };
-
     void load_texture_job(void* data)
     {
         auto job_data = (load_texture_data_t*)data;
 
-        SDL_Surface* surface = IMG_Load(job_data->path.c_str());
-        if (!surface)
-            ;// return std::unexpected(foundation::error_t{ .message = SDL_GetError() });
+        fd::println("load texture '{}'", job_data->path.c_str());
 
-        SDL_Texture* texture = SDL_CreateTextureFromSurface(engine->renderer(), surface);
+        SDL_Surface* surface = IMG_Load(job_data->path.c_str()); // todo DONT BLOCK JOB ASSHOLE
+        if (!surface)
+            throw fd::error_t(SDL_GetError());
+
+        SDL_Texture* texture = SDL_CreateTextureFromSurface(platform->get_sdl_renderer(job_data->window), surface);
         if (!texture)
-            ;// return std::unexpected(foundation::error_t{ .message = SDL_GetError() });
+            throw fd::error_t(SDL_GetError());
 
         SDL_DestroySurface(surface);
 
         job_data->texture = texture;
     }
 
-    std::expected<foundation::texture_handle_t, foundation::error_t> load_sprite(std::string path)
+    std::expected<fd::texture_t, fd::error_t> load_sprite(std::string path, fd::window_t window)
     {
         // lookup cached
         for (size_t i = 0; i < texture_paths.size(); ++i)
         {
             if (texture_paths[i] == path)
-                return i;
+                return (fd::texture_t)i;
         }
 
         // load
         load_texture_data_t data;
+        data.window = window;
         data.path = get_assets_path() + "\\" + path;
-        auto job = job_system->run_jobs({ foundation::jobdecl_t{ &load_texture_job, &data } });
+        auto job = job_system->run_jobs({ fd::jobdecl_t{ &load_texture_job, &data } });
         job_system->wait_for_counter(job, 0);
 
-        auto textureIdx = textures.size();
+        auto texture_idx = textures.size();
         textures.push_back(data.texture);
         texture_paths.push_back(path);
-        return textureIdx;
+        return (fd::texture_t)texture_idx;
     }
 
-    SDL_Texture* texture(foundation::texture_handle_t handle)
+    SDL_Texture* texture(fd::texture_t handle)
     {
-        return textures[handle];
+        return textures[(size_t)handle];
     }
 }
 
-extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
+extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool reload, void* old_dll)
 {
-    engine = api.get<foundation::engine_t>();
-    job_system = api.get<foundation::job_system_t>();
+    platform = api.get<fd::platform_t>();
+    job_system = api.get<fd::job_system_t>();
 
-    foundation::sprite_manager_t sm;
+    fd::sprite_manager_t sm;
     sm.load_sprite = &load_sprite;
     sm.texture = &texture;
 
     api.set(sm);
 }
 
-extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)
+extern "C" __declspec(dllexport) void unload_plugin(fd::api_registry_t& api, bool reload)
 {
     // api.remove(foo);
     // delete foo;

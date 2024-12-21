@@ -3,12 +3,21 @@ export module foundation:print;
 import std;
 import <Windows.h>;
 
-namespace foundation
+namespace fd
 {
     export void clear_log()
     {
         std::ofstream outfile;
         outfile.open("game.log", std::ios_base::trunc);
+    }
+
+    export void println(const char* str)
+    {
+        ::OutputDebugStringA(str);
+
+        std::ofstream outfile;
+        outfile.open("game.log", std::ios_base::app);
+        outfile << str;
     }
 
     export template<typename... Args>

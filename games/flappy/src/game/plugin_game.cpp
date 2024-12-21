@@ -1,7 +1,9 @@
+#include <Windows.h>
+
 import foundation;
 import <SDL3/SDL.h>;
 import <entt/entt.hpp>;
-import <nlohmann/json.hpp>;
+//import <nlohmann/json.hpp>;
 import std;
 
 namespace fs = std::filesystem;
@@ -21,17 +23,17 @@ struct bird_t {};
 struct pipe_t {};
 
 struct transform_t {
-    foundation::float2 value;
+    fd::float2 value;
     float angle;
 };
 
 struct velocity_t {
-    foundation::float2 linear;
+    fd::float2 linear;
 };
 
 struct sprite_t {
-    foundation::texture_handle_t texture;
-    foundation::float2 size;
+    fd::texture_t texture;
+    fd::float2 size;
 };
 
 enum update_result {
@@ -45,18 +47,19 @@ const auto fixed_time_step = 1.f / 30.f;
 
 namespace
 {
-    foundation::engine_t* engine;
-    foundation::sprite_manager_t* sprite_manager;
+    fd::platform_t* platform;
+    fd::sprite_manager_t* sprite_manager;
+    fd::window_t window;
     entt::registry registry;
     Uint64 lastTime = 0;
     float accTime = 0;
 
-    std::expected<update_result, foundation::error_t> game_fixed_update(entt::registry& registry);
-    std::expected<void, foundation::error_t> game_render(const entt::registry& registry);
+    std::expected<update_result, fd::error_t> game_fixed_update(entt::registry& registry);
+    void game_render(const entt::registry& registry);
 
     void start()
     {
-        engine->init(288, 512, "Flappy");
+        window = *platform->create_window(288, 512, "Flappy");
 
         auto& ctx = registry.ctx();
         ctx.emplace<::game>();
@@ -65,14 +68,14 @@ namespace
     bool run_once()
     {
         Uint64 time = SDL_GetPerformanceCounter();
-        float secondsElapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
-        if (secondsElapsed > 0.25f)
+        float seconds_elapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
+        if (seconds_elapsed > 0.25f)
         {
-            secondsElapsed = 0.25f;
+            seconds_elapsed = 0.25f;
         }
         lastTime = time;
 
-        accTime += secondsElapsed;
+        accTime += seconds_elapsed;
 
         while (accTime >= fixed_time_step)
         {
@@ -82,17 +85,17 @@ namespace
         }
 
         // #todo interpolate rendering
-        *game_render(registry);
+        game_render(registry);
 
         return true;
     }
 
     void exit()
     {
-        engine->deinit();
+        platform->destroy_window(window);
     }
 
-    std::expected<update_result, foundation::error_t> game_fixed_update(entt::registry& registry)
+    std::expected<update_result, fd::error_t> game_fixed_update(entt::registry& registry)
     {
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
@@ -119,24 +122,24 @@ namespace
 
         if (game.state == game_state::none)
         {
-            auto birdTexture = sprite_manager->load_sprite("sprites\\bluebird-downflap.png");
-            auto pipeTexture = sprite_manager->load_sprite("sprites\\pipe-red.png");
+            auto bird_texture = sprite_manager->load_sprite("sprites\\bluebird-downflap.png", window);
+            auto pipe_texture = sprite_manager->load_sprite("sprites\\pipe-red.png", window);
 
-            auto birdEntity = registry.create();
-            registry.emplace<transform_t>(birdEntity, foundation::float2{ 288 * 0.5f, 512 * 0.5f });
-            registry.emplace<sprite_t>(birdEntity, *birdTexture, foundation::float2{ 64,64 });
-            registry.emplace<velocity_t>(birdEntity, foundation::float2{ 0, 0 });
-            registry.emplace<bird_t>(birdEntity);
+            auto bird_entity = registry.create();
+            registry.emplace<transform_t>(bird_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
+            registry.emplace<sprite_t>(bird_entity, *bird_texture, fd::float2{ 64,64 });
+            registry.emplace<velocity_t>(bird_entity, fd::float2{ 0, 0 });
+            registry.emplace<bird_t>(bird_entity);
 
-            auto pipeEntity = registry.create();
-            registry.emplace<transform_t>(pipeEntity, foundation::float2{ 70.f, 220 * 0.5f });
-            registry.emplace<sprite_t>(pipeEntity, *pipeTexture, foundation::float2{ 64,220 });
-            registry.emplace<pipe_t>(pipeEntity);
+            auto pipe_entity = registry.create();
+            registry.emplace<transform_t>(pipe_entity, fd::float2{ 70.f, 220 * 0.5f });
+            registry.emplace<sprite_t>(pipe_entity, *pipe_texture, fd::float2{ 64,220 });
+            registry.emplace<pipe_t>(pipe_entity);
 
-            auto pipe2Entity = registry.create();
-            registry.emplace<transform_t>(pipe2Entity, foundation::float2{ 70.f, 512 - 220 * 0.5f }, 180.f);
-            registry.emplace<sprite_t>(pipe2Entity, *pipeTexture, foundation::float2{ 64,220 });
-            registry.emplace<pipe_t>(pipe2Entity);
+            auto pipe2_entity = registry.create();
+            registry.emplace<transform_t>(pipe2_entity, fd::float2{ 70.f, 512 - 220 * 0.5f }, 180.f);
+            registry.emplace<sprite_t>(pipe2_entity, *pipe_texture, fd::float2{ 64,220 });
+            registry.emplace<pipe_t>(pipe2_entity);
 
             game.state = game_state::running;
         }
@@ -147,10 +150,10 @@ namespace
                 velo.linear.y += bird_flap ? 4 : 0;
                 });
 
-            auto birdView = registry.view<bird_t, velocity_t>();
-            for (auto entity : birdView) {
-                auto [velocity] = birdView.get(entity);
-                velocity.linear.y -= 0.2f;
+            auto bird_view = registry.view<bird_t, velocity_t>();
+            for (auto entity : bird_view) {
+                auto [velocity] = bird_view.get(entity);
+                velocity.linear.y -= 0.2f; // <-------------------------------------------------------------------------------------------
             }
 
             registry.view<velocity_t, transform_t>().each([](auto& velocity, auto& position) {
@@ -158,9 +161,9 @@ namespace
                 });
 
             bool lost = false;
-            foundation::float2 birdPos;
+            fd::float2 bird_pos;
             registry.view<bird_t, transform_t>().each([&](auto& tf) {
-                birdPos = tf.value;
+                bird_pos = tf.value;
                 if (tf.value.y < 0 || tf.value.y > 500)
                 {
                     lost = true;
@@ -174,7 +177,7 @@ namespace
                     tf.value.x = 300;
                 }
 
-                SDL_FPoint birdP{ birdPos.x, birdPos.y };
+                SDL_FPoint birdP{ bird_pos.x, bird_pos.y };
                 SDL_FRect rect{ tf.value.x - 32, tf.value.y - 110, 64, 220 };
                 if (SDL_PointInRectFloat(&birdP, &rect))
                 {
@@ -184,6 +187,7 @@ namespace
 
             if (lost)
             {
+                fd::println("lost game");
                 game.state = game_state::lost;
                 game.death_time = 2;
             }
@@ -193,6 +197,8 @@ namespace
             game.death_time -= fixed_time_step;
             if (game.death_time <= 0)
             {
+                fd::println("restart game");
+
                 registry.clear(); // reset game
                 game.state = game_state::none;
             }
@@ -201,88 +207,96 @@ namespace
         return update_result::keep_running;
     }
 
-    std::expected<void, foundation::error_t> game_render(const entt::registry& registry)
+    void game_render(const entt::registry& registry)
     {
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
 
-        int windowHeight;
-        if (!SDL_GetWindowSize(engine->window(), nullptr, &windowHeight))
-            return std::unexpected(foundation::error_t{ .message = SDL_GetError() });
+        int window_height;
+        if (!SDL_GetWindowSize(platform->get_sdl_window(window), nullptr, &window_height))
+            throw fd::error_t(SDL_GetError());
 
         // clear
-        SDL_SetRenderDrawColor(engine->renderer(), 80, 80, 80, SDL_ALPHA_OPAQUE);
-        SDL_RenderClear(engine->renderer());
+        SDL_SetRenderDrawColor(platform->get_sdl_renderer(window), 80, 80, 80, SDL_ALPHA_OPAQUE);
+        SDL_RenderClear(platform->get_sdl_renderer(window));
 
         // draw background
         {
-            auto bgTexture = *sprite_manager->load_sprite("sprites\\background-day.png");
+            auto bg_texture = *sprite_manager->load_sprite("sprites\\background-day.png", window);
 
             SDL_FRect dst_rect;
             dst_rect.x = 0;
             dst_rect.y = 0;
             dst_rect.w = 288;
             dst_rect.h = 512;
-            SDL_RenderTexture(engine->renderer(), sprite_manager->texture(bgTexture), NULL, &dst_rect);
+            if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(bg_texture), NULL, &dst_rect))
+                throw fd::error_t(SDL_GetError());
         }
 
         // draw debug text
-        // SDL_SetRenderDrawColor(engine->renderer(), 255, 255, 255, SDL_ALPHA_OPAQUE);
-        // SDL_RenderDebugText(engine->renderer(), 5, 5, std::to_string((int)game.state).c_str());
+        // SDL_SetRenderDrawColor(platform->renderer(window), 255, 255, 255, SDL_ALPHA_OPAQUE);
+        // SDL_RenderDebugText(platform->renderer(window), 5, 5, std::to_string((int)game.state).c_str());
 
         // draw sprites
-        auto rendableView = registry.view<transform_t, sprite_t>();
-        rendableView.each([&](auto& pos, auto& sprite) {
+        auto rendable_view = registry.view<transform_t, sprite_t>();
+        rendable_view.each([&](auto& pos, auto& sprite) {
             SDL_FRect dst_rect;
             dst_rect.x = pos.value.x - sprite.size.x * 0.5f;
-            dst_rect.y = (windowHeight - pos.value.y) - sprite.size.y * 0.5f;
+            dst_rect.y = (window_height - pos.value.y) - sprite.size.y * 0.5f;
             dst_rect.w = sprite.size.x;
             dst_rect.h = sprite.size.y;
 
             auto texture = sprite_manager->texture(sprite.texture);
 
-            SDL_RenderTextureRotated(engine->renderer(), texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE);
+            if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE))
+                throw fd::error_t(SDL_GetError());
             });
 
         // draw game over
         if (game.state == game_state::lost)
         {
-            auto bgTexture = *sprite_manager->load_sprite("sprites\\gameover.png");
+            auto bg_texture = *sprite_manager->load_sprite("sprites\\gameover.png", window);
 
             SDL_FRect dst_rect;
             dst_rect.x = 288 * 0.5f - 192 * 0.5f;
             dst_rect.y = 512 * 0.5f - 42 * 0.5f;
             dst_rect.w = 192;
             dst_rect.h = 42;
-            SDL_RenderTexture(engine->renderer(), sprite_manager->texture(bgTexture), NULL, &dst_rect);
+            if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(bg_texture), NULL, &dst_rect))
+                throw fd::error_t(SDL_GetError());
         }
 
         // present
-        if (!SDL_RenderPresent(engine->renderer()))
-            return std::unexpected(foundation::error_t{ .message = SDL_GetError() });
-
-        return {};
+        if (!SDL_RenderPresent(platform->get_sdl_renderer(window)))
+            throw fd::error_t(SDL_GetError());
     }
 }
 
-extern "C" __declspec(dllexport) void plugin_fix_runtime(entt::locator<entt::meta_ctx>::node_type handle)
+extern "C" __declspec(dllexport) void set_plugin_runtime(entt::locator<entt::meta_ctx>::node_type handle)
 {
     entt::locator<entt::meta_ctx>::reset(handle);
 }
 
-extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api, bool reload)
+extern "C" __declspec(dllexport) void* FOO()
 {
+    return window;
+}
 
-
-    engine = api.get<foundation::engine_t>();
-    sprite_manager = api.get<foundation::sprite_manager_t>();
+extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool reload, void* old_dll)
+{
+    platform = api.get<fd::platform_t>();
+    sprite_manager = api.get<fd::sprite_manager_t>();
 
     if (reload)
     {
-        // foo->registry = std::move(existing_game->registry);
+        auto& ctx = registry.ctx();
+        ctx.emplace<::game>();
+
+        auto foo = (void* (*)())::GetProcAddress((HMODULE)old_dll, "FOO");
+        window = foo();
     }
 
-    foundation::game_t game;
+    fd::game_t game;
     game.start = &start;
     game.run_once = &run_once;
     game.exit = &exit;
@@ -290,8 +304,12 @@ extern "C" __declspec(dllexport) void plugin_load(foundation::api_registry& api,
     api.set(game);
 }
 
-extern "C" __declspec(dllexport) void plugin_unload(foundation::api_registry& api, bool reload)
+extern "C" __declspec(dllexport) void unload_plugin(fd::api_registry_t& api, bool reload)
 {
+    if (reload)
+    {
+    }
+
     // api.remove(foo);
     // delete foo;
 }

@@ -7,8 +7,15 @@ export module foundation:global_exception_handler;
 import std;
 import :print;
 
-namespace foundation
+namespace fd
 {
+    LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
+
+    export void install_global_exception_handler()
+    {
+        ::SetUnhandledExceptionFilter(ExceptionHandler);
+    }
+
     LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {
         DWORD exceptionCode = exceptionInfo->ExceptionRecord->ExceptionCode;
         const void* exceptionAddress = exceptionInfo->ExceptionRecord->ExceptionAddress;
@@ -42,22 +49,17 @@ namespace foundation
         auto st = std::stacktrace::current();
 
 
-        foundation::println("");
-        foundation::println("!!!!! CRASH !!!!!");
-        foundation::println("code={} {}", exceptionCode, ExceptionCodeToString(exceptionCode));
+        fd::println("");
+        fd::println("!!!!! CRASH !!!!!");
+        fd::println("code={} {}", exceptionCode, ExceptionCodeToString(exceptionCode));
 
         auto it = std::begin(st);
         std::advance(it, 7); // skip handler
         for (; it != std::end(st); ++it)
         {
-            foundation::println("{}({}): {}", it->source_file(), it->source_line(), it->description());
+            fd::println("{}({}): {}", it->source_file(), it->source_line(), it->description());
         }
 
         return EXCEPTION_EXECUTE_HANDLER;
-    }
-
-    export void install_global_exception_handler()
-    {
-        ::SetUnhandledExceptionFilter(ExceptionHandler);
     }
 }

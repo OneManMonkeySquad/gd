@@ -1,21 +1,9 @@
-module;
-
-#include <Windows.h>
-
-export module foundation:global_exception_handler;
-
-import std;
-import :print;
+#include "global_exception_handler.h"
+#include "print.h"
+#include <stacktrace>
 
 namespace fd
 {
-    LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* exceptionInfo);
-
-    export void install_global_exception_handler()
-    {
-        ::SetUnhandledExceptionFilter(ExceptionHandler);
-    }
-
     LONG WINAPI ExceptionHandler(EXCEPTION_POINTERS* exceptionInfo) {
         DWORD exceptionCode = exceptionInfo->ExceptionRecord->ExceptionCode;
         const void* exceptionAddress = exceptionInfo->ExceptionRecord->ExceptionAddress;
@@ -61,5 +49,10 @@ namespace fd
         }
 
         return EXCEPTION_EXECUTE_HANDLER;
+    }
+
+    void install_global_exception_handler()
+    {
+        ::SetUnhandledExceptionFilter(ExceptionHandler);
     }
 }

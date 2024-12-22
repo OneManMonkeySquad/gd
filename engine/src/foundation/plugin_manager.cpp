@@ -1,18 +1,7 @@
-module;
-
-#include <Windows.h>
-
-export module foundation:plugin_manager;
-
-import std;
-import <SDL3/SDL.h>;
-import <entt/entt.hpp>;
-import "FileWatch.hpp";
-
-import :print;
-import :api_registry_t;
-
-namespace fs = std::filesystem;
+#include "plugin_manager.h"
+#include "api_registry.h"
+#include "print.h"
+#include <SDL3/SDL.h>
 
 namespace fd
 {
@@ -20,192 +9,171 @@ namespace fd
         const std::string& pdbname,
         std::string& orig_pdb);
 
+    plugin_manager_t::plugin_manager_t() : api_registry(*get_api_registry()) {}
 
-
-    export struct plugin_manager_t
+    plugin_manager_t::loaded_plugin_t plugin_manager_t::load_plugin(fs::path plugin_path, bool is_reload, void* old_dll)
     {
-        using plugin_t = HMODULE;
-        using plugin_fix_runtime_t = void(*)(entt::locator<entt::meta_ctx>::node_type foo);
-        using plugin_load_t = void(*)(fd::api_registry_t&, bool reload, void* old_dll);
-        using plugin_unload_t = void(*)(fd::api_registry_t&, bool reload);
+        fd::println("Loading plugin '{}'...", plugin_path.filename().string());
 
-        struct loaded_plugin_t
+        auto temp_plugin_path = plugin_path;
+        temp_plugin_path.replace_filename(std::format("_{}_{}", std::rand(), temp_plugin_path.filename().string()));
+        fd::println("   Temp path '{}'", temp_plugin_path.filename().string());
+
+        if (!::CopyFileW(plugin_path.wstring().c_str(), temp_plugin_path.wstring().c_str(), false))
+            throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
+
+        auto pdbPath = plugin_path;
+        pdbPath.replace_extension(".pdb");
+
+        auto temp_pdb_path = temp_plugin_path;
+        temp_pdb_path.replace_extension(".pdb");
+        fd::println("   Temp pdb path '{}'", temp_pdb_path.filename().string());
+
+        // note: pdb might be missing, ignore error
+        if (::CopyFileW(pdbPath.wstring().c_str(), temp_pdb_path.wstring().c_str(), false))
         {
-            plugin_t handle;
-            fs::path temp_dll_path;
-            fs::path temp_pdb_path;
-        };
+            std::string origPdb;
+            cr_pdb_replace(temp_plugin_path.string(), temp_plugin_path.filename().replace_extension(".pdb").string(), origPdb);
+        }
 
-        fd::api_registry_t& api_registry;
-        std::unordered_map<fs::path, loaded_plugin_t> plugin_modules;
-        std::mutex dirty_files_lock;
-        std::vector<fs::path> dirty_files;
-        std::unique_ptr<filewatch::FileWatch<std::string>> watcher;
+        auto plugin = ::LoadLibraryW(temp_plugin_path.wstring().c_str());
+        if (plugin == nullptr)
+            throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
 
-        plugin_manager_t(fd::api_registry_t& api_registry) : api_registry(api_registry) {}
+        auto handle = entt::locator<entt::meta_ctx>::handle();
 
-        loaded_plugin_t load_plugin(fs::path plugin_path, bool is_reload, void* old_dll)
+        auto plugin_fix_runtime = (plugin_fix_runtime_t)::GetProcAddress(plugin, "set_plugin_runtime");
+        if (plugin_fix_runtime != nullptr)
         {
-            fd::println("Loading plugin '{}'...", plugin_path.filename().string());
+            plugin_fix_runtime(handle);
+        }
 
-            auto temp_plugin_path = plugin_path;
-            temp_plugin_path.replace_filename(std::format("_{}_{}", std::rand(), temp_plugin_path.filename().string()));
-            fd::println("   Temp path '{}'", temp_plugin_path.filename().string());
+        auto plugin_load = (plugin_load_t)::GetProcAddress(plugin, "load_plugin");
+        plugin_load(api_registry, is_reload, old_dll);
 
-            if (!::CopyFileW(plugin_path.wstring().c_str(), temp_plugin_path.wstring().c_str(), false))
-                throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
+        loaded_plugin_t entry;
+        entry.handle = plugin;
+        entry.temp_dll_path = temp_plugin_path;
+        entry.temp_pdb_path = temp_pdb_path;
+        return entry;
+    }
 
-            auto pdbPath = plugin_path;
-            pdbPath.replace_extension(".pdb");
+    void plugin_manager_t::unload_plugin(loaded_plugin_t plugin, bool is_reload)
+    {
+        auto plugin_unload = (plugin_unload_t)::GetProcAddress(plugin.handle, "unload_plugin");
+        plugin_unload(api_registry, is_reload);
 
-            auto temp_pdb_path = temp_plugin_path;
-            temp_pdb_path.replace_extension(".pdb");
-            fd::println("   Temp pdb path '{}'", temp_pdb_path.filename().string());
+        ::FreeLibrary(plugin.handle);
+    }
 
-            // note: pdb might be missing, ignore error
-            if (::CopyFileW(pdbPath.wstring().c_str(), temp_pdb_path.wstring().c_str(), false))
+    void plugin_manager_t::on_file_changed(const std::string& path, const filewatch::Event event)
+    {
+        if (event != filewatch::Event::modified)
+            return;
+
+        dirty_file_manually(fs::path{ SDL_GetBasePath() } / path);
+        // fd::println("{} {}", (fs::path{ SDL_GetBasePath() } / path).string(), filewatch::event_to_string(event));
+    }
+
+    bool plugin_manager_t::is_plugin_path(fs::path path)
+    {
+        const auto filename = path.filename().string();
+        bool is_plugin = filename.starts_with("plugin_") && filename.ends_with(".dll");
+        return is_plugin;
+    }
+
+    /// <summary>
+    /// Search and load found plugins. Also, start watching directory for hot-reload.
+    /// </summary>
+    void plugin_manager_t::init()
+    {
+        watcher = std::make_unique<filewatch::FileWatch<std::string>>(SDL_GetBasePath(),
+            [&](const std::string& path, const filewatch::Event event) { on_file_changed(path, event); });
+
+        // Load plugins
+        for (const auto& dir_entry : fs::directory_iterator{ SDL_GetBasePath() })
+        {
+            if (!is_plugin_path(dir_entry.path()))
+                continue;
+
+            loaded_plugin_t entry = load_plugin(dir_entry.path(), false, nullptr);
+            plugin_modules.emplace(dir_entry.path(), entry);
+        }
+
+        fd::println("Plugins successfully loaded");
+    }
+
+    void plugin_manager_t::dirty_file_manually(fs::path absolute_file_path)
+    {
+        std::scoped_lock lock{ dirty_files_lock };
+        dirty_files.push_back(absolute_file_path);
+    }
+
+    void plugin_manager_t::update()
+    {
+        // reload dirty files
+        std::vector<fs::path> dirty_files_copy;
+        if (dirty_files_lock.try_lock()) {
+            dirty_files_copy = dirty_files;
+            dirty_files.clear();
+            dirty_files_lock.unlock();
+        }
+
+        if (!dirty_files_copy.empty())
+        {
+            for (const auto& dirty_file_path : dirty_files_copy)
             {
-                std::string origPdb;
-                cr_pdb_replace(temp_plugin_path.string(), temp_plugin_path.filename().replace_extension(".pdb").string(), origPdb);
-            }
-
-            auto plugin = ::LoadLibraryW(temp_plugin_path.wstring().c_str());
-            if (plugin == nullptr)
-                throw std::system_error(std::error_code(::GetLastError(), std::system_category()));
-
-            auto handle = entt::locator<entt::meta_ctx>::handle();
-
-            auto plugin_fix_runtime = (plugin_fix_runtime_t)::GetProcAddress(plugin, "set_plugin_runtime");
-            if (plugin_fix_runtime != nullptr)
-            {
-                plugin_fix_runtime(handle);
-            }
-
-            auto plugin_load = (plugin_load_t)::GetProcAddress(plugin, "load_plugin");
-            plugin_load(api_registry, is_reload, old_dll);
-
-            loaded_plugin_t entry;
-            entry.handle = plugin;
-            entry.temp_dll_path = temp_plugin_path;
-            entry.temp_pdb_path = temp_pdb_path;
-            return entry;
-        }
-
-        void unload_plugin(loaded_plugin_t plugin, bool is_reload)
-        {
-            auto plugin_unload = (plugin_unload_t)::GetProcAddress(plugin.handle, "unload_plugin");
-            plugin_unload(api_registry, is_reload);
-
-            ::FreeLibrary(plugin.handle);
-        }
-
-        void on_file_changed(const std::string& path, const filewatch::Event event)
-        {
-            if (event != filewatch::Event::modified)
-                return;
-
-            dirty_file_manually(fs::path{ SDL_GetBasePath() } / path);
-            // fd::println("{} {}", (fs::path{ SDL_GetBasePath() } / path).string(), filewatch::event_to_string(event));
-        }
-
-        static bool is_plugin_path(fs::path path)
-        {
-            const auto filename = path.filename().string();
-            bool is_plugin = filename.starts_with("plugin_") && filename.ends_with(".dll");
-            return is_plugin;
-        }
-
-        /// <summary>
-        /// Search and load found plugins. Also, start watching directory for hot-reload.
-        /// </summary>
-        void init()
-        {
-            watcher = std::make_unique<filewatch::FileWatch<std::string>>(SDL_GetBasePath(),
-                [&](const std::string& path, const filewatch::Event event) { on_file_changed(path, event); });
-
-            // Load plugins
-            for (const auto& dir_entry : fs::directory_iterator{ SDL_GetBasePath() })
-            {
-                if (!is_plugin_path(dir_entry.path()))
+                if (!plugin_modules.contains(dirty_file_path))
                     continue;
 
-                loaded_plugin_t entry = load_plugin(dir_entry.path(), false, nullptr);
-                plugin_modules.emplace(dir_entry.path(), entry);
-            }
+                fd::println("Plugin changed '{}'", dirty_file_path.filename().string());
 
-            fd::println("Plugins successfully loaded");
-        }
-
-        void dirty_file_manually(fs::path absolute_file_path)
-        {
-            std::scoped_lock lock{ dirty_files_lock };
-            dirty_files.push_back(absolute_file_path);
-        }
-
-        void update()
-        {
-            // reload dirty files
-            std::vector<fs::path> dirty_files_copy;
-            if (dirty_files_lock.try_lock()) {
-                dirty_files_copy = dirty_files;
-                dirty_files.clear();
-                dirty_files_lock.unlock();
-            }
-
-            if (!dirty_files_copy.empty())
-            {
-                for (const auto& dirty_file_path : dirty_files_copy)
+                try
                 {
-                    if (!plugin_modules.contains(dirty_file_path))
-                        continue;
+                    auto loaded_entry = plugin_modules[dirty_file_path];
 
-                    fd::println("Plugin changed '{}'", dirty_file_path.filename().string());
+                    auto entry2 = load_plugin(dirty_file_path, true, loaded_entry.handle);
 
-                    try
-                    {
-                        auto loaded_entry = plugin_modules[dirty_file_path];
+                    fd::println("   Unload old plugin");
 
-                        auto entry2 = load_plugin(dirty_file_path, true, loaded_entry.handle);
+                    unload_plugin(loaded_entry, true);
 
-                        fd::println("   Unload old plugin");
+                    // update entry
+                    plugin_modules[dirty_file_path] = entry2;
 
-                        unload_plugin(loaded_entry, true);
-
-                        // update entry
-                        plugin_modules[dirty_file_path] = entry2;
-
-                        fd::println("Plugin reload successful");
-                    }
-                    catch (const std::exception& e)
-                    {
-                        fd::println("   Plugin reload failed: {}", e.what());
-                    }
+                    fd::println("Plugin reload successful");
                 }
-
-                dirty_files_copy.clear();
+                catch (const std::exception& e)
+                {
+                    fd::println("   Plugin reload failed: {}", e.what());
+                }
             }
-        }
 
-        void exit()
+            dirty_files_copy.clear();
+        }
+    }
+
+    void plugin_manager_t::unload_all_plugins()
+    {
+        // unload all modules
+        for (auto& [path, entry] : plugin_modules)
         {
-            // unload all modules
-            for (auto [path, entry] : plugin_modules)
-            {
-                fd::println("Unloading plugin '{}'...", path.filename().string());
+            fd::println("Unloading plugin '{}'...", path.filename().string());
 
-                unload_plugin(entry, false);
+            unload_plugin(entry, false);
 
-                // note: might fail if we are debugging
-                // #todo delete on next start
-                (void)::DeleteFileW(entry.temp_dll_path.wstring().c_str());
+            // note: might fail if we are debugging
+            // #todo delete on next start
+            (void)::DeleteFileW(entry.temp_dll_path.wstring().c_str());
 
-                // note: pdb might be missing, ignore error
-                (void)::DeleteFileW(entry.temp_pdb_path.wstring().c_str());
-            }
-
-            fd::println("Plugins successfully unloaded");
+            // note: pdb might be missing, ignore error
+            (void)::DeleteFileW(entry.temp_pdb_path.wstring().c_str());
         }
-    };
+
+        plugin_modules.clear();
+
+        fd::println("Plugins successfully unloaded");
+    }
 
     template <class T>
     static T struct_cast(void* ptr, LONG offset = 0) {

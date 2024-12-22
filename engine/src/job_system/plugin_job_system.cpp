@@ -1,8 +1,10 @@
-import <windows.h>;
-import foundation;
-import std;
-
 #include "mpmc_bounded_queue.h"
+#include "foundation/foundation.h"
+#include "foundation/print.h"
+#include "foundation/api_registry.h"
+#include <windows.h>
+
+import std;
 
 #define assert(expression) (void)(                                                       \
             (!!(expression)) ||                                                              \
@@ -93,8 +95,15 @@ namespace
         }
     }
 
+    void translate_seh_to_cpp(unsigned int code, EXCEPTION_POINTERS* ep)
+    {
+        throw std::runtime_error("SEH exception occurred");
+    }
+
     void worker_thread()
     {
+        _set_se_translator(translate_seh_to_cpp);
+
         auto this_fiber = ::ConvertThreadToFiber(nullptr);
 
         while (!exit_workers)

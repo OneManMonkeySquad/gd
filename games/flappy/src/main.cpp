@@ -1,19 +1,22 @@
+#include "foundation\plugin_manager.h"
+#include "foundation\print.h"
+#include "foundation\api_registry.h"
+#include "foundation\foundation.h"
 #include "SDL3\SDL_filesystem.h"
-
-import <windows.h>;
-import foundation;
-import std;
+#include "flappy_game/flappy_game.h"
+#include <Windows.h>
 
 namespace fs = std::filesystem;
 
 namespace
 {
-    fd::api_registry_t api_registry;
+    fd::plugin_manager_t plugin_manager;
 }
+
 
 void run()
 {
-    fd::install_global_exception_handler();
+    // fd::install_global_exception_handler();
 
     fd::clear_log();
 
@@ -24,16 +27,16 @@ void run()
     std::setlocale(2, ".UTF8");
 #endif
 
-    auto game = api_registry.get<fd::game_t>();
-    auto platform = api_registry.get<fd::platform_t>();
+    auto api_registry = fd::get_api_registry();
+    auto game = api_registry->get<flappy_game_t>();
+    auto platform = api_registry->get<fd::platform_t>();
 
-    fd::plugin_manager_t plugin_manager{ api_registry };
     plugin_manager.init();
 
     fd::println("");
     fd::println("*-*-* RUN *-*-*");
 
-    auto js = api_registry.get<fd::job_system_t>();
+    auto js = api_registry->get<fd::job_system_t>();
     js->init();
 
     platform->init();
@@ -63,18 +66,11 @@ void run()
 
     js->deinit();
 
-    plugin_manager.exit();
+    plugin_manager.unload_all_plugins();
 }
 
 int main()
 {
-    try
-    {
-        run();
-    }
-    catch (const std::exception& e)
-    {
-        fd::println(e.what());
-    }
+    run();
     return 0;
 }

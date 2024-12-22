@@ -1,7 +1,12 @@
-import foundation;
-import <SDL3/SDL.h>;
-import <SDL3_image/SDL_image.h>;
-import std;
+#include "foundation/foundation.h"
+#include "foundation/print.h"
+#include "foundation/api_registry.h"
+#include <SDL3/SDL.h>
+#include <SDL3_image/SDL_image.h>
+
+//import <SDL3/SDL.h>;
+//import <SDL3_image/SDL_image.h>;
+//import std;
 
 namespace
 {

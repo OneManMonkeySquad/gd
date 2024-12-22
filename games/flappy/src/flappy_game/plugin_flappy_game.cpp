@@ -1,10 +1,14 @@
+#include "flappy_game.h"
+#include "foundation\engine_math.h"
+#include "foundation\foundation.h"
+#include "foundation\api_registry.h"
 #include <Windows.h>
+#include <SDL3/SDL.h>
 
-import foundation;
-import <SDL3/SDL.h>;
-import <entt/entt.hpp>;
-//import <nlohmann/json.hpp>;
-import std;
+//import <SDL3/SDL.h>;
+//import <entt/entt.hpp>;
+////import <nlohmann/json.hpp>;
+//import std;
 
 namespace fs = std::filesystem;
 
@@ -45,17 +49,19 @@ enum update_result {
 
 const auto fixed_time_step = 1.f / 30.f;
 
+using registry_t = entt::registry;
+
 namespace
 {
     fd::platform_t* platform;
     fd::sprite_manager_t* sprite_manager;
     fd::window_t window;
-    entt::registry registry;
-    Uint64 lastTime = 0;
+    registry_t registry;
+    std::uint64_t lastTime = 0;
     float accTime = 0;
 
-    std::expected<update_result, fd::error_t> game_fixed_update(entt::registry& registry);
-    void game_render(const entt::registry& registry);
+    std::expected<update_result, fd::error_t> game_fixed_update(registry_t& registry);
+    void game_render(const registry_t& registry);
 
     void start()
     {
@@ -67,7 +73,7 @@ namespace
 
     bool run_once()
     {
-        Uint64 time = SDL_GetPerformanceCounter();
+        std::uint64_t time = SDL_GetPerformanceCounter();
         float seconds_elapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
         if (seconds_elapsed > 0.25f)
         {
@@ -95,7 +101,7 @@ namespace
         platform->destroy_window(window);
     }
 
-    std::expected<update_result, fd::error_t> game_fixed_update(entt::registry& registry)
+    std::expected<update_result, fd::error_t> game_fixed_update(registry_t& registry)
     {
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
@@ -153,7 +159,7 @@ namespace
             auto bird_view = registry.view<bird_t, velocity_t>();
             for (auto entity : bird_view) {
                 auto [velocity] = bird_view.get(entity);
-                velocity.linear.y -= 0.2f; // <-------------------------------------------------------------------------------------------
+                velocity.linear.y -= 0.02f; // <-------------------------------------------------------------------------------------------
             }
 
             registry.view<velocity_t, transform_t>().each([](auto& velocity, auto& position) {
@@ -187,7 +193,7 @@ namespace
 
             if (lost)
             {
-                fd::println("lost game");
+                // fd::println("lost game");
                 game.state = game_state::lost;
                 game.death_time = 2;
             }
@@ -197,7 +203,7 @@ namespace
             game.death_time -= fixed_time_step;
             if (game.death_time <= 0)
             {
-                fd::println("restart game");
+                // fd::println("restart game");
 
                 registry.clear(); // reset game
                 game.state = game_state::none;
@@ -207,7 +213,7 @@ namespace
         return update_result::keep_running;
     }
 
-    void game_render(const entt::registry& registry)
+    void game_render(const registry_t& registry)
     {
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game>();
@@ -277,9 +283,18 @@ extern "C" __declspec(dllexport) void set_plugin_runtime(entt::locator<entt::met
     entt::locator<entt::meta_ctx>::reset(handle);
 }
 
-extern "C" __declspec(dllexport) void* FOO()
+struct foo_t
 {
-    return window;
+    fd::window_t p1;
+    registry_t* p2;
+};
+
+extern "C" __declspec(dllexport) foo_t FOO(fd::window_t& p1, registry_t& p2)
+{
+    foo_t foo;
+    foo.p1 = window;
+    foo.p2 = &registry;
+    return foo;
 }
 
 extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool reload, void* old_dll)
@@ -289,14 +304,13 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
 
     if (reload)
     {
-        auto& ctx = registry.ctx();
-        ctx.emplace<::game>();
-
-        auto foo = (void* (*)())::GetProcAddress((HMODULE)old_dll, "FOO");
-        window = foo();
+        auto foo = (foo_t(*)())::GetProcAddress((HMODULE)old_dll, "FOO");
+        auto baa = foo();
+        window = baa.p1;
+        registry = std::move(*baa.p2);
     }
 
-    fd::game_t game;
+    flappy_game_t game;
     game.start = &start;
     game.run_once = &run_once;
     game.exit = &exit;

@@ -3,11 +3,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 
 
-add_library(plugin_game
-    src/game/plugin_game.cpp)
-target_link_libraries(plugin_game PRIVATE foundation nlohmann_json::nlohmann_json)
-target_compile_options(plugin_game PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
-set_target_properties(plugin_game PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_library(plugin_flappy_game
+    src/flappy_game/plugin_flappy_game.cpp
+    src/flappy_game/flappy_game.h)
+target_link_libraries(plugin_flappy_game PRIVATE foundation nlohmann_json::nlohmann_json)
+target_compile_options(plugin_flappy_game PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
+set_target_properties(plugin_flappy_game PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+target_include_directories(plugin_flappy_game PUBLIC "${CMAKE_CURRENT_LIST_DIR}/src")
 
 
 add_executable(flappy

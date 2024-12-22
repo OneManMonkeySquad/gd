@@ -21,6 +21,7 @@ The views and conclusions contained in the software and documentation are those 
 #pragma once
 
 #include <assert.h>
+#include <atomic>
 
 template<typename T>
 class mpmc_bounded_queue

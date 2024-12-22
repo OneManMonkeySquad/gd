@@ -1,16 +1,16 @@
-module;
+#pragma once
 
+#include "api.h"
 #include <Windows.h>
+#include <list>
+#include <entt/entt.hpp>
 
-export module foundation:api_registry_t;
-
-import std;
-import <entt/entt.hpp>;
-import :print;
+//import std;
+//import <entt/entt.hpp>;
 
 namespace fd
 {
-    export struct api_registry_t
+    struct api_registry_t
     {
         // note: this needs to be a list for api pointers to have a fixed address
         std::list<std::pair<entt::id_type, void*>> _foo;
@@ -32,16 +32,11 @@ namespace fd
             _foo.push_back(std::make_pair(name, new T(api)));
         }
 
-        void remove(void* api)
+
+        template<typename T>
+        void reset()
         {
-            for (auto& pair : _foo)
-            {
-                if (pair.second == api)
-                {
-                    pair.second = nullptr;
-                    return;
-                }
-            }
+            set<T>(T{});
         }
 
         /// <summary>
@@ -63,4 +58,6 @@ namespace fd
             return (T*)ref.second;
         }
     };
+
+    API api_registry_t* get_api_registry();
 }

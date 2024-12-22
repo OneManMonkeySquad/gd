@@ -1,6 +1,6 @@
-import foundation;
-import std;
-import <SDL3/SDL.h>;
+#include "foundation/foundation.h"
+#include "foundation/api_registry.h"
+#include <SDL3/SDL.h>
 
 namespace
 {
@@ -79,5 +79,5 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
 
 extern "C" __declspec(dllexport) void unload_plugin(fd::api_registry_t& api, bool reload)
 {
-    // api.remove(&engine);
+    api.reset<fd::platform_t>();
 }

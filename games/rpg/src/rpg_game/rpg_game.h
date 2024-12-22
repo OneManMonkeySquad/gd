@@ -11,7 +11,7 @@ struct state_t
     registry_t* p2;
 };
 
-struct flappy_game_t
+struct rpg_game_t
 {
     state_t(*get_state)();
     void (*start)();

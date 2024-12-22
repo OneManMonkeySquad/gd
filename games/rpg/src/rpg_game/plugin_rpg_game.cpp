@@ -1,4 +1,4 @@
-#include "flappy_game.h"
+#include "rpg_game.h"
 #include "foundation\engine_math.h"
 #include "foundation\foundation.h"
 #include "foundation\api_registry.h"
@@ -19,7 +19,6 @@ struct game {
 };
 
 struct bird_t {};
-struct pipe_t {};
 
 struct transform_t {
     fd::float2 value;
@@ -58,7 +57,7 @@ namespace
 
     void start()
     {
-        window = *platform->create_window(288, 512, "Flappy");
+        window = *platform->create_window(512, 512, "RPG");
 
         auto& ctx = registry.ctx();
         ctx.emplace<::game>();
@@ -122,23 +121,12 @@ namespace
         if (game.state == game_state::none)
         {
             auto bird_texture = sprite_manager->load_sprite("sprites\\bluebird-downflap.png", window);
-            auto pipe_texture = sprite_manager->load_sprite("sprites\\pipe-red.png", window);
 
             auto bird_entity = registry.create();
             registry.emplace<transform_t>(bird_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
             registry.emplace<sprite_t>(bird_entity, *bird_texture, fd::float2{ 64,64 });
             registry.emplace<velocity_t>(bird_entity, fd::float2{ 0, 0 });
             registry.emplace<bird_t>(bird_entity);
-
-            auto pipe_entity = registry.create();
-            registry.emplace<transform_t>(pipe_entity, fd::float2{ 70.f, 220 * 0.5f });
-            registry.emplace<sprite_t>(pipe_entity, *pipe_texture, fd::float2{ 64,220 });
-            registry.emplace<pipe_t>(pipe_entity);
-
-            auto pipe2_entity = registry.create();
-            registry.emplace<transform_t>(pipe2_entity, fd::float2{ 70.f, 512 - 220 * 0.5f }, 180.f);
-            registry.emplace<sprite_t>(pipe2_entity, *pipe_texture, fd::float2{ 64,220 });
-            registry.emplace<pipe_t>(pipe2_entity);
 
             game.state = game_state::running;
         }
@@ -164,21 +152,6 @@ namespace
             registry.view<bird_t, transform_t>().each([&](auto& tf) {
                 bird_pos = tf.value;
                 if (tf.value.y < 0 || tf.value.y > 500)
-                {
-                    lost = true;
-                }
-                });
-
-            registry.view<pipe_t, transform_t>().each([&](auto& tf) {
-                tf.value.x -= 5;
-                if (tf.value.x < -60)
-                {
-                    tf.value.x = 300;
-                }
-
-                SDL_FPoint birdP{ bird_pos.x, bird_pos.y };
-                SDL_FRect rect{ tf.value.x - 32, tf.value.y - 110, 64, 220 };
-                if (SDL_PointInRectFloat(&birdP, &rect))
                 {
                     lost = true;
                 }
@@ -219,16 +192,22 @@ namespace
         SDL_SetRenderDrawColor(platform->get_sdl_renderer(window), 80, 80, 80, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(platform->get_sdl_renderer(window));
 
-        // draw background
         {
-            auto bg_texture = *sprite_manager->load_sprite("sprites\\background-day.png", window);
+            auto texture = *sprite_manager->load_sprite("sprites\\world.bmp", window);
+
+            SDL_FRect src_rect;
+            src_rect.x = 0;
+            src_rect.y = 0;
+            src_rect.w = 16;
+            src_rect.h = 16;
 
             SDL_FRect dst_rect;
-            dst_rect.x = 0;
-            dst_rect.y = 0;
-            dst_rect.w = 288;
-            dst_rect.h = 512;
-            if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(bg_texture), NULL, &dst_rect))
+            dst_rect.x = 30;
+            dst_rect.y = 30;
+            dst_rect.w = 30;
+            dst_rect.h = 30;
+
+            if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(texture), &src_rect, &dst_rect))
                 throw fd::error_t(SDL_GetError());
         }
 
@@ -250,20 +229,6 @@ namespace
             if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE))
                 throw fd::error_t(SDL_GetError());
             });
-
-        // draw game over
-        if (game.state == game_state::lost)
-        {
-            auto bg_texture = *sprite_manager->load_sprite("sprites\\gameover.png", window);
-
-            SDL_FRect dst_rect;
-            dst_rect.x = 288 * 0.5f - 192 * 0.5f;
-            dst_rect.y = 512 * 0.5f - 42 * 0.5f;
-            dst_rect.w = 192;
-            dst_rect.h = 42;
-            if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(bg_texture), NULL, &dst_rect))
-                throw fd::error_t(SDL_GetError());
-        }
 
         // present
         if (!SDL_RenderPresent(platform->get_sdl_renderer(window)))
@@ -295,14 +260,14 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
 
     if (reload)
     {
-        auto existing_game = api.get<flappy_game_t>();
+        auto existing_game = api.get<rpg_game_t>();
 
         auto foo = existing_game->get_state();
         window = foo.p1;
         registry = std::move(*foo.p2);
     }
 
-    flappy_game_t game;
+    rpg_game_t game;
     game.get_state = get_state;
     game.start = start;
     game.run_once = run_once;

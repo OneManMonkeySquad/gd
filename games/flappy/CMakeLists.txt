@@ -30,3 +30,8 @@ add_custom_command(
 add_custom_command(
     TARGET flappy POST_BUILD
     COMMAND "${CMAKE_COMMAND}" -E copy $<TARGET_FILE:SDL3_image::SDL3_image> $<TARGET_PDB_FILE:SDL3_image::SDL3_image> ${CMAKE_BINARY_DIR}/bin/$<CONFIG>)
+
+set_target_properties(
+    plugin_flappy_game
+    flappy
+    PROPERTIES FOLDER "Flappy")

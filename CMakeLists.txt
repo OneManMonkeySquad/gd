@@ -15,7 +15,10 @@ add_subdirectory(deps/entt)
 add_subdirectory(deps/json)
 add_subdirectory(engine)
 add_subdirectory(games/flappy)
+add_subdirectory(games/rpg)
 
-set_target_properties(SDL3-shared PROPERTIES FOLDER "Deps")
-set_target_properties(SDL_uclibc PROPERTIES FOLDER "Deps")
-set_target_properties(SDL3_image-shared PROPERTIES FOLDER "Deps")
+set_target_properties(
+    SDL3-shared
+    SDL_uclibc
+    SDL3_image-shared
+    PROPERTIES FOLDER "Deps")

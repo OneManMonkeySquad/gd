@@ -2,6 +2,7 @@
 #include "foundation\engine_math.h"
 #include "foundation\foundation.h"
 #include "foundation\api_registry.h"
+#include "foundation\event_stream.h"
 #include <Windows.h>
 #include <SDL3/SDL.h>
 
@@ -13,15 +14,16 @@ enum class game_state {
     lost
 };
 
-struct game {
+struct game_t {
     game_state state;
     float death_time;
 };
 
-struct bird_t {};
+struct player_t {};
+struct camera_t {};
 
 struct transform_t {
-    fd::float2 value;
+    fd::float2 position;
     float angle;
 };
 
@@ -34,18 +36,12 @@ struct sprite_t {
     fd::float2 size;
 };
 
-enum update_result {
-    keep_running,
-    quit
-};
-
-
-
 const auto fixed_time_step = 1.f / 30.f;
 
 namespace
 {
     fd::platform_t* platform;
+    fd::input_t* input;
     fd::sprite_manager_t* sprite_manager;
     fd::window_t window;
     registry_t registry;
@@ -60,11 +56,23 @@ namespace
         window = *platform->create_window(512, 512, "RPG");
 
         auto& ctx = registry.ctx();
-        ctx.emplace<::game>();
+        ctx.emplace<::game_t>();
     }
 
-    bool run_once()
+    update_result run_once()
     {
+        //
+        auto evts = platform->get_engine_events();
+        for (auto evt_pair : *evts)
+        {
+            if (evt_pair.first == fd::engine_event::quit)
+                return update_result::quit;
+        }
+
+        if (input->is_key_down(SDL_SCANCODE_ESCAPE))
+            return update_result::quit;
+
+        //
         std::uint64_t time = SDL_GetPerformanceCounter();
         float seconds_elapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
         if (seconds_elapsed > 0.25f)
@@ -79,13 +87,13 @@ namespace
         {
             accTime -= fixed_time_step;
             if (game_fixed_update(registry) != update_result::keep_running)
-                return false;
+                return update_result::quit;
         }
 
         // #todo interpolate rendering
         game_render(registry);
 
-        return true;
+        return update_result::keep_running;
     }
 
     void exit()
@@ -96,62 +104,36 @@ namespace
     std::expected<update_result, fd::error_t> game_fixed_update(registry_t& registry)
     {
         auto& ctx = registry.ctx();
-        auto& game = ctx.get<::game>();
-
-        // handle events
-        bool bird_flap = false;
-
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT)
-                return update_result::quit;
-
-            if (event.type == SDL_EVENT_KEY_DOWN)
-            {
-                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
-                    return update_result::quit;
-
-                if (event.key.scancode == SDL_SCANCODE_SPACE)
-                {
-                    bird_flap = true;
-                }
-            }
-        }
+        auto& game = ctx.get<::game_t>();
 
         if (game.state == game_state::none)
         {
             auto bird_texture = sprite_manager->load_sprite("sprites\\bluebird-downflap.png", window);
 
+            auto camera_entity = registry.create();
+            registry.emplace<transform_t>(camera_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
+            registry.emplace<camera_t>(camera_entity);
+
             auto bird_entity = registry.create();
             registry.emplace<transform_t>(bird_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
             registry.emplace<sprite_t>(bird_entity, *bird_texture, fd::float2{ 64,64 });
             registry.emplace<velocity_t>(bird_entity, fd::float2{ 0, 0 });
-            registry.emplace<bird_t>(bird_entity);
+            registry.emplace<player_t>(bird_entity);
 
             game.state = game_state::running;
         }
         else if (game.state == game_state::running)
         {
             // simulate
-            registry.view<bird_t, velocity_t>().each([&](auto& velo) {
-                velo.linear.y += bird_flap ? 4 : 0;
-                });
-
-            auto bird_view = registry.view<bird_t, velocity_t>();
-            for (auto entity : bird_view) {
-                auto [velocity] = bird_view.get(entity);
-                velocity.linear.y -= 0.02f; // <-------------------------------------------------------------------------------------------
-            }
-
             registry.view<velocity_t, transform_t>().each([](auto& velocity, auto& position) {
-                position.value += velocity.linear;
+                position.position += velocity.linear;
                 });
 
             bool lost = false;
             fd::float2 bird_pos;
-            registry.view<bird_t, transform_t>().each([&](auto& tf) {
-                bird_pos = tf.value;
-                if (tf.value.y < 0 || tf.value.y > 500)
+            registry.view<player_t, transform_t>().each([&](auto& tf) {
+                bird_pos = tf.position;
+                if (tf.position.y < 0 || tf.position.y > 500)
                 {
                     lost = true;
                 }
@@ -182,7 +164,7 @@ namespace
     void game_render(const registry_t& registry)
     {
         auto& ctx = registry.ctx();
-        auto& game = ctx.get<::game>();
+        auto& game = ctx.get<::game_t>();
 
         int window_height;
         if (!SDL_GetWindowSize(platform->get_sdl_window(window), nullptr, &window_height))
@@ -192,42 +174,47 @@ namespace
         SDL_SetRenderDrawColor(platform->get_sdl_renderer(window), 80, 80, 80, SDL_ALPHA_OPAQUE);
         SDL_RenderClear(platform->get_sdl_renderer(window));
 
-        {
-            auto texture = *sprite_manager->load_sprite("sprites\\world.bmp", window);
-
-            SDL_FRect src_rect;
-            src_rect.x = 0;
-            src_rect.y = 0;
-            src_rect.w = 16;
-            src_rect.h = 16;
-
-            SDL_FRect dst_rect;
-            dst_rect.x = 30;
-            dst_rect.y = 30;
-            dst_rect.w = 30;
-            dst_rect.h = 30;
-
-            if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(texture), &src_rect, &dst_rect))
-                throw fd::error_t(SDL_GetError());
-        }
-
         // draw debug text
         // SDL_SetRenderDrawColor(platform->renderer(window), 255, 255, 255, SDL_ALPHA_OPAQUE);
         // SDL_RenderDebugText(platform->renderer(window), 5, 5, std::to_string((int)game.state).c_str());
 
         // draw sprites
-        auto rendable_view = registry.view<transform_t, sprite_t>();
-        rendable_view.each([&](auto& pos, auto& sprite) {
-            SDL_FRect dst_rect;
-            dst_rect.x = pos.value.x - sprite.size.x * 0.5f;
-            dst_rect.y = (window_height - pos.value.y) - sprite.size.y * 0.5f;
-            dst_rect.w = sprite.size.x;
-            dst_rect.h = sprite.size.y;
+        auto camera_view = registry.view<transform_t, camera_t>();
+        camera_view.each([&](auto& camera_tf) {
 
-            auto texture = sprite_manager->texture(sprite.texture);
+            {
+                auto texture = *sprite_manager->load_sprite("sprites\\world.bmp", window);
 
-            if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE))
-                throw fd::error_t(SDL_GetError());
+                SDL_FRect src_rect;
+                src_rect.x = 0;
+                src_rect.y = 0;
+                src_rect.w = 16;
+                src_rect.h = 16;
+
+                SDL_FRect dst_rect;
+                dst_rect.x = 30;
+                dst_rect.y = 30;
+                dst_rect.w = 30;
+                dst_rect.h = 30;
+
+                if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(texture), &src_rect, &dst_rect))
+                    throw fd::error_t(SDL_GetError());
+            }
+
+            auto rendable_view = registry.view<transform_t, sprite_t>();
+            rendable_view.each([&](auto& pos, auto& sprite) {
+                SDL_FRect dst_rect;
+                dst_rect.x = (pos.position.x - sprite.size.x * 0.5f) + camera_tf.position.x;
+                dst_rect.y = ((window_height - pos.position.y) - sprite.size.y * 0.5f) + camera_tf.position.y;
+                dst_rect.w = sprite.size.x;
+                dst_rect.h = sprite.size.y;
+
+                auto texture = sprite_manager->texture(sprite.texture);
+
+                if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE))
+                    throw fd::error_t(SDL_GetError());
+                });
+
             });
 
         // present
@@ -256,6 +243,7 @@ extern "C" __declspec(dllexport) state_t get_state()
 extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool reload, void* old_dll)
 {
     platform = api.get<fd::platform_t>();
+    input = api.get<fd::input_t>();
     sprite_manager = api.get<fd::sprite_manager_t>();
 
     if (reload)

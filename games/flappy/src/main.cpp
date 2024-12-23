@@ -43,18 +43,14 @@ void run()
 
     game->start();
 
-    bool once = false;
     while (true)
     {
+        platform->update();
+
         if (!game->run_once())
             break;
 
         plugin_manager.update();
-        if (!once)
-        {
-            once = true;
-            plugin_manager.dirty_file_manually(fs::path{ SDL_GetBasePath() } / "plugin_game.dll");
-        }
     }
 
     fd::println("");

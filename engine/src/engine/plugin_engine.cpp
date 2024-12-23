@@ -1,5 +1,6 @@
 #include "foundation/foundation.h"
 #include "foundation/api_registry.h"
+#include "foundation/event_stream.h"
 #include <SDL3/SDL.h>
 
 namespace
@@ -9,6 +10,9 @@ namespace
         SDL_Window* window = nullptr;
         SDL_Renderer* renderer = nullptr;
     };
+
+    fd::event_stream_t engine_events;
+    fd::event_stream_t input_events;
 
     std::expected<void, fd::error_t> init()
     {
@@ -46,6 +50,39 @@ namespace
         delete my_window;
     }
 
+    fd::event_stream_t* get_engine_events()
+    {
+        return &engine_events;
+    }
+
+    bool _key_is_down[SDL_SCANCODE_COUNT] = { false };
+
+    void update()
+    {
+        engine_events.clear();
+        input_events.clear();
+
+        SDL_Event event;
+        while (SDL_PollEvent(&event)) {
+            if (event.type == SDL_EVENT_QUIT)
+            {
+                engine_events.append(fd::engine_event::quit);
+            }
+            else if (event.type == SDL_EVENT_KEY_DOWN)
+            {
+                _key_is_down[event.key.scancode] = true;
+
+                input_events.append(fd::input_event::key_down);
+            }
+            else if (event.type == SDL_EVENT_KEY_UP)
+            {
+                _key_is_down[event.key.scancode] = false;
+
+                input_events.append(fd::input_event::key_up);
+            }
+        }
+    }
+
     SDL_Window* get_sdl_window(fd::window_t window)
     {
         auto my_window = (my_window_t*)window;
@@ -55,6 +92,16 @@ namespace
     {
         auto my_window = (my_window_t*)window;
         return my_window->renderer;
+    }
+
+    fd::event_stream_t* get_input_events()
+    {
+        return &input_events;
+    }
+
+    bool is_key_down(int key_code)
+    {
+        return _key_is_down[key_code];
     }
 }
 
@@ -68,16 +115,24 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
     }
 
     fd::platform_t platform;
-    platform.init = &init;
-    platform.exit = &exit;
-    platform.create_window = &create_window;
-    platform.destroy_window = &destroy_window;
-    platform.get_sdl_renderer = &get_sdl_renderer;
-    platform.get_sdl_window = &get_sdl_window;
+    platform.init = init;
+    platform.exit = exit;
+    platform.update = update;
+    platform.create_window = create_window;
+    platform.destroy_window = destroy_window;
+    platform.get_sdl_renderer = get_sdl_renderer;
+    platform.get_sdl_window = get_sdl_window;
+    platform.get_engine_events = get_engine_events;
     api.set(platform);
+
+    fd::input_t input;
+    input.get_input_events = get_input_events;
+    input.is_key_down = is_key_down;
+    api.set(input);
 }
 
 extern "C" __declspec(dllexport) void unload_plugin(fd::api_registry_t& api, bool reload)
 {
     api.reset<fd::platform_t>();
+    api.reset<fd::input_t>();
 }

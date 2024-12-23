@@ -13,7 +13,9 @@ add_library(foundation
     src/foundation/engine_math.h
     src/foundation/api_registry.h
     src/foundation/api_registry.cpp
-    src/foundation/FileWatch.h)
+    src/foundation/FileWatch.h
+    src/foundation/event_stream.h
+    src/foundation/event_stream.cpp)
 target_link_libraries(foundation PUBLIC SDL3::SDL3-shared EnTT::EnTT)
 target_compile_options(foundation PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
 target_compile_definitions(foundation PRIVATE foundation_dll_export)

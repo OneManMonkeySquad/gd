@@ -11,10 +11,16 @@ struct state_t
     registry_t* p2;
 };
 
+enum update_result
+{
+    keep_running,
+    quit
+};
+
 struct rpg_game_t
 {
     state_t(*get_state)();
     void (*start)();
-    bool (*run_once)();
+    update_result(*run_once)();
     void (*exit)();
 };

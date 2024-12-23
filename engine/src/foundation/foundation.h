@@ -12,6 +12,19 @@ struct SDL_Texture;
 
 namespace fd
 {
+    enum engine_event
+    {
+        quit
+    };
+
+    enum input_event
+    {
+        key_down,
+        key_up
+    };
+
+    struct event_stream_t;
+
     using error_t = std::exception;
 
 
@@ -21,12 +34,22 @@ namespace fd
     {
         std::expected<void, fd::error_t>(*init)();
         void (*exit)();
+        void (*update)();
 
         std::expected<window_t, fd::error_t>(*create_window)(int width, int height, const char* title);
         void(*destroy_window)(window_t window);
 
+        event_stream_t* (*get_engine_events)();
+
         SDL_Window* (*get_sdl_window)(window_t window);
         SDL_Renderer* (*get_sdl_renderer)(window_t window);
+    };
+
+    struct input_t
+    {
+        event_stream_t* (*get_input_events)();
+
+        bool (*is_key_down)(int key_code);
     };
 
 

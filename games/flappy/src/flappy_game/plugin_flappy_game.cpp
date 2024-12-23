@@ -2,6 +2,7 @@
 #include "foundation\engine_math.h"
 #include "foundation\foundation.h"
 #include "foundation\api_registry.h"
+#include "foundation\event_stream.h"
 #include <Windows.h>
 #include <SDL3/SDL.h>
 
@@ -13,12 +14,12 @@ enum class game_state {
     lost
 };
 
-struct game {
+struct game_t {
     game_state state;
     float death_time;
 };
 
-struct bird_t {};
+struct player_t {};
 struct pipe_t {};
 
 struct transform_t {
@@ -47,6 +48,7 @@ const auto fixed_time_step = 1.f / 30.f;
 namespace
 {
     fd::platform_t* platform;
+    fd::input_t* input;
     fd::sprite_manager_t* sprite_manager;
     fd::window_t window;
     registry_t registry;
@@ -61,11 +63,23 @@ namespace
         window = *platform->create_window(288, 512, "Flappy");
 
         auto& ctx = registry.ctx();
-        ctx.emplace<::game>();
+        ctx.emplace<::game_t>();
     }
 
     bool run_once()
     {
+        //
+        auto evts = platform->get_engine_events();
+        for (auto evt_pair : *evts)
+        {
+            if (evt_pair.first == fd::engine_event::quit)
+                return update_result::quit;
+        }
+
+        if (input->is_key_down(SDL_SCANCODE_ESCAPE))
+            return update_result::quit;
+
+        //
         std::uint64_t time = SDL_GetPerformanceCounter();
         float seconds_elapsed = (time - lastTime) / (float)SDL_GetPerformanceFrequency();
         if (seconds_elapsed > 0.25f)
@@ -97,27 +111,9 @@ namespace
     std::expected<update_result, fd::error_t> game_fixed_update(registry_t& registry)
     {
         auto& ctx = registry.ctx();
-        auto& game = ctx.get<::game>();
+        auto& game = ctx.get<::game_t>();
 
-        // handle events
-        bool bird_flap = false;
-
-        SDL_Event event;
-        while (SDL_PollEvent(&event)) {
-            if (event.type == SDL_EVENT_QUIT)
-                return update_result::quit;
-
-            if (event.type == SDL_EVENT_KEY_DOWN)
-            {
-                if (event.key.scancode == SDL_SCANCODE_ESCAPE)
-                    return update_result::quit;
-
-                if (event.key.scancode == SDL_SCANCODE_SPACE)
-                {
-                    bird_flap = true;
-                }
-            }
-        }
+        bool bird_flap = input->is_key_down(SDL_SCANCODE_SPACE);
 
         if (game.state == game_state::none)
         {
@@ -128,7 +124,7 @@ namespace
             registry.emplace<transform_t>(bird_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
             registry.emplace<sprite_t>(bird_entity, *bird_texture, fd::float2{ 64,64 });
             registry.emplace<velocity_t>(bird_entity, fd::float2{ 0, 0 });
-            registry.emplace<bird_t>(bird_entity);
+            registry.emplace<player_t>(bird_entity);
 
             auto pipe_entity = registry.create();
             registry.emplace<transform_t>(pipe_entity, fd::float2{ 70.f, 220 * 0.5f });
@@ -145,11 +141,11 @@ namespace
         else if (game.state == game_state::running)
         {
             // simulate
-            registry.view<bird_t, velocity_t>().each([&](auto& velo) {
+            registry.view<player_t, velocity_t>().each([&](auto& velo) {
                 velo.linear.y += bird_flap ? 4 : 0;
                 });
 
-            auto bird_view = registry.view<bird_t, velocity_t>();
+            auto bird_view = registry.view<player_t, velocity_t>();
             for (auto entity : bird_view) {
                 auto [velocity] = bird_view.get(entity);
                 velocity.linear.y -= 0.02f; // <-------------------------------------------------------------------------------------------
@@ -161,7 +157,7 @@ namespace
 
             bool lost = false;
             fd::float2 bird_pos;
-            registry.view<bird_t, transform_t>().each([&](auto& tf) {
+            registry.view<player_t, transform_t>().each([&](auto& tf) {
                 bird_pos = tf.value;
                 if (tf.value.y < 0 || tf.value.y > 500)
                 {
@@ -209,7 +205,7 @@ namespace
     void game_render(const registry_t& registry)
     {
         auto& ctx = registry.ctx();
-        auto& game = ctx.get<::game>();
+        auto& game = ctx.get<::game_t>();
 
         int window_height;
         if (!SDL_GetWindowSize(platform->get_sdl_window(window), nullptr, &window_height))
@@ -291,6 +287,7 @@ extern "C" __declspec(dllexport) state_t get_state()
 extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool reload, void* old_dll)
 {
     platform = api.get<fd::platform_t>();
+    input = api.get<fd::input_t>();
     sprite_manager = api.get<fd::sprite_manager_t>();
 
     if (reload)

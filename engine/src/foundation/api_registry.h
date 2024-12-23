@@ -40,8 +40,8 @@ namespace fd
         }
 
         /// <summary>
-        /// Get api pointer. May return an invalid pointer that is
-        /// patched later when the corresponding api is loaded.
+        /// Get api pointer. May return a valid pointer with INVALID function
+        /// pointers that will be patched later when the corresponding api is set.
         /// </summary>
         template<typename T>
         T* get()

@@ -10,7 +10,11 @@ maybe enemies attack the base sometimes?
 - Fighter might have to return
 - Gives the builder a second objective
 
+Let the Builder influence portal events (e.g., deploying drones or calling the Fighter back for specific emergencies).
+
 Hades 2: https://youtu.be/OD-IJ1WqUxQ?t=269
+
+!! KEEP IT 2D YOU FUCKING BABOON !!
 
 ## Game Loop
 

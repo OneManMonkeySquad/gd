@@ -1,9 +1,9 @@
-# RPG
+# Multiplayer Coop
 
-    multiplayer coop 1 builder 1 fighter
+    1 builder 1 fighter
     hades 2 combat + factorio production
     top down
-    portal leads to rouge-lite hades 2 combat - spits out resources as the fighter dives into portal and fights enemies
+    portal leads to rogue-lite hades 2 combat - spits out resources as the fighter dives into portal and fights enemies
     builder produces upgrades/consumables for the fighter, fighter produces resources for the builder
 
     maybe enemies attack the base sometimes?

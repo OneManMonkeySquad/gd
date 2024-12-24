@@ -1,20 +1,20 @@
 # RPG
 
-multiplayer coop 1 builder 1 fighter
-hades 2 combat + factorio production
-top down
-portal leads to rouge-lite hades 2 combat - spits out resources as the fighter dives into portal and fights enemies
-builder produces upgrades/consumables for the fighter, fighter produces resources for the builder
+    multiplayer coop 1 builder 1 fighter
+    hades 2 combat + factorio production
+    top down
+    portal leads to rouge-lite hades 2 combat - spits out resources as the fighter dives into portal and fights enemies
+    builder produces upgrades/consumables for the fighter, fighter produces resources for the builder
 
-maybe enemies attack the base sometimes?
-- Fighter might have to return
-- Gives the builder a second objective
+    maybe enemies attack the base sometimes?
+    - Fighter might have to return
+    - Gives the builder a second objective
 
-Let the Builder influence portal events (e.g., deploying drones or calling the Fighter back for specific emergencies).
+    Let the Builder influence portal events (e.g., deploying drones or calling the Fighter back for specific emergencies).
 
-Hades 2: https://youtu.be/OD-IJ1WqUxQ?t=269
+    Hades 2 combat: https://youtu.be/OD-IJ1WqUxQ?t=269
 
-!! KEEP IT 2D YOU FUCKING BABOON !!
+    !! KEEP IT 2D YOU FUCKING BABOON !!
 
 ## Game Loop
 

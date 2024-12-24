@@ -4,7 +4,7 @@
     hades 2 combat + factorio production
     top down
     portal leads to rogue-lite hades 2 combat - spits out resources as the fighter dives into portal and fights enemies
-    builder produces upgrades/consumables for the fighter, fighter produces resources for the builder
+    builder produces upgrades/consumables for the fighter using these resources
 
     maybe enemies attack the base sometimes?
     - Fighter might have to return
@@ -14,7 +14,7 @@
 
     Hades 2 combat: https://youtu.be/OD-IJ1WqUxQ?t=269
 
-    !! KEEP IT 2D YOU FUCKING BABOON !!
+    KEEP IT 2D YOU FUCKING BABOON
 
 ## Game Loop
 
@@ -75,6 +75,7 @@
 
     Role Variance:
         Players can swap roles between sessions for a fresh perspective on teamwork and strategy.
+        Both players can fight if base defense is build up enough.
 
     Difficulty Scaling:
         Base raids and portal dungeon challenges scale as the team progresses, ensuring consistent tension.

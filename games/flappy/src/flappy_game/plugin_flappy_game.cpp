@@ -76,7 +76,7 @@ namespace
                 return update_result::quit;
         }
 
-        if (input->is_key_down(SDL_SCANCODE_ESCAPE))
+        if (input->is_key_pressed(SDL_SCANCODE_ESCAPE))
             return update_result::quit;
 
         //
@@ -113,7 +113,7 @@ namespace
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game_t>();
 
-        bool bird_flap = input->is_key_down(SDL_SCANCODE_SPACE);
+        bool bird_flap = input->is_key_pressed(SDL_SCANCODE_SPACE);
 
         if (game.state == game_state::none)
         {

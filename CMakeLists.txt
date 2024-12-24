@@ -14,6 +14,7 @@ add_subdirectory(deps/SDL3_image)
 add_subdirectory(deps/entt)
 add_subdirectory(deps/json)
 add_subdirectory(engine)
+add_subdirectory(tools/asset_compiler)
 add_subdirectory(games/flappy)
 add_subdirectory(games/rpg)
 

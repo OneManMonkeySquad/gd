@@ -50,6 +50,8 @@ namespace fd
 
         void dirty_file_manually(fs::path absolute_file_path);
 
+        void blocking_wait_until_any_plugin_changes();
+
         void update();
 
         void unload_all_plugins();

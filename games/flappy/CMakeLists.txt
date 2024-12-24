@@ -19,6 +19,7 @@ target_compile_definitions(flappy PRIVATE WIN32_LEAN_AND_MEAN NOMINMAX)
 target_link_options(flappy PRIVATE "/SUBSYSTEM:WINDOWS" "/ENTRY:mainCRTStartup")
 target_compile_options(flappy PRIVATE /source-charset:utf-8 /execution-charset:utf-8)
 set_target_properties(flappy PROPERTIES RUNTIME_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/bin")
+add_dependencies(flappy plugin_flappy_game)
 
 
 add_custom_command(

@@ -3,6 +3,7 @@
 #include "foundation\foundation.h"
 #include "foundation\api_registry.h"
 #include "foundation\event_stream.h"
+#include "foundation\print.h"
 #include <Windows.h>
 #include <SDL3/SDL.h>
 
@@ -11,12 +12,10 @@ namespace fs = std::filesystem;
 enum class game_state {
     none,
     running,
-    lost
 };
 
 struct game_t {
     game_state state;
-    float death_time;
 };
 
 struct player_t {};
@@ -27,13 +26,10 @@ struct transform_t {
     float angle;
 };
 
-struct velocity_t {
-    fd::float2 linear;
-};
-
 struct sprite_t {
     fd::texture_t texture;
     fd::float2 size;
+    fd::float2 texture_offset;
 };
 
 const auto fixed_time_step = 1.f / 30.f;
@@ -53,7 +49,7 @@ namespace
 
     void start()
     {
-        window = *platform->create_window(512, 512, "RPG");
+        window = *platform->create_window(800, 600, "RPG");
 
         auto& ctx = registry.ctx();
         ctx.emplace<::game_t>();
@@ -69,7 +65,7 @@ namespace
                 return update_result::quit;
         }
 
-        if (input->is_key_down(SDL_SCANCODE_ESCAPE))
+        if (input->is_key_pressed(SDL_SCANCODE_ESCAPE))
             return update_result::quit;
 
         //
@@ -108,54 +104,48 @@ namespace
 
         if (game.state == game_state::none)
         {
-            auto bird_texture = sprite_manager->load_sprite("sprites\\bluebird-downflap.png", window);
+            auto player_texture = sprite_manager->load_sprite("sprites\\entities.bmp", window);
 
             auto camera_entity = registry.create();
             registry.emplace<transform_t>(camera_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
             registry.emplace<camera_t>(camera_entity);
 
-            auto bird_entity = registry.create();
-            registry.emplace<transform_t>(bird_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
-            registry.emplace<sprite_t>(bird_entity, *bird_texture, fd::float2{ 64,64 });
-            registry.emplace<velocity_t>(bird_entity, fd::float2{ 0, 0 });
-            registry.emplace<player_t>(bird_entity);
+            auto player_entity = registry.create();
+            registry.emplace<transform_t>(player_entity, fd::float2{ 288 * 0.5f, 512 * 0.5f });
+            registry.emplace<sprite_t>(player_entity, *player_texture, fd::float2{ 16,16 }, fd::float2{ 0,0 });
+            registry.emplace<player_t>(player_entity);
 
             game.state = game_state::running;
         }
         else if (game.state == game_state::running)
         {
             // simulate
-            registry.view<velocity_t, transform_t>().each([](auto& velocity, auto& position) {
-                position.position += velocity.linear;
-                });
+            fd::float2 player_pos = fd::float2::zero;
 
-            bool lost = false;
-            fd::float2 bird_pos;
             registry.view<player_t, transform_t>().each([&](auto& tf) {
-                bird_pos = tf.position;
-                if (tf.position.y < 0 || tf.position.y > 500)
+                if (input->is_key_pressed(SDL_SCANCODE_W))
                 {
-                    lost = true;
+                    tf.position.y += 4;
                 }
+                if (input->is_key_pressed(SDL_SCANCODE_S))
+                {
+                    tf.position.y -= 4;
+                }
+                if (input->is_key_pressed(SDL_SCANCODE_A))
+                {
+                    tf.position.x -= 4;
+                }
+                if (input->is_key_pressed(SDL_SCANCODE_D))
+                {
+                    tf.position.x += 4;
+                }
+
+                player_pos = tf.position;
                 });
 
-            if (lost)
-            {
-                // fd::println("lost game");
-                game.state = game_state::lost;
-                game.death_time = 2;
-            }
-        }
-        else if (game.state == game_state::lost)
-        {
-            game.death_time -= fixed_time_step;
-            if (game.death_time <= 0)
-            {
-                // fd::println("restart game");
-
-                registry.clear(); // reset game
-                game.state = game_state::none;
-            }
+            registry.view<camera_t, transform_t>().each([&](auto& tf) {
+                tf.position = fd::lerp(tf.position, player_pos, 0.1f);
+                });
         }
 
         return update_result::keep_running;
@@ -166,8 +156,9 @@ namespace
         auto& ctx = registry.ctx();
         auto& game = ctx.get<::game_t>();
 
+        int window_width;
         int window_height;
-        if (!SDL_GetWindowSize(platform->get_sdl_window(window), nullptr, &window_height))
+        if (!SDL_GetWindowSize(platform->get_sdl_window(window), &window_width, &window_height))
             throw fd::error_t(SDL_GetError());
 
         // clear
@@ -181,43 +172,60 @@ namespace
         // draw sprites
         auto camera_view = registry.view<transform_t, camera_t>();
         camera_view.each([&](auto& camera_tf) {
+            auto pixel_scale = 4;
 
+            // note: the camera transform positon is the center of the camera
+            auto camera_pos = camera_tf.position - fd::float2(window_width * 0.5f, window_height * 0.5f);
+
+            // Map
             {
                 auto texture = *sprite_manager->load_sprite("sprites\\world.bmp", window);
 
-                SDL_FRect src_rect;
-                src_rect.x = 0;
-                src_rect.y = 0;
-                src_rect.w = 16;
-                src_rect.h = 16;
+                for (int x = 0; x < 14; ++x)
+                {
+                    for (int y = 0; y < 14; ++y)
+                    {
+                        SDL_FRect src_rect;
+                        src_rect.x = ((x + y * 133502863135036867) % 2) * 16;
+                        src_rect.y = 0;
+                        src_rect.w = 16;
+                        src_rect.h = 16;
 
-                SDL_FRect dst_rect;
-                dst_rect.x = 30;
-                dst_rect.y = 30;
-                dst_rect.w = 30;
-                dst_rect.h = 30;
+                        SDL_FRect dst_rect;
+                        dst_rect.x = 16 * x * pixel_scale - camera_pos.x;
+                        dst_rect.y = 16 * y * pixel_scale + camera_pos.y;
+                        dst_rect.w = 16 * pixel_scale;
+                        dst_rect.h = 16 * pixel_scale;
 
-                if (!SDL_RenderTexture(platform->get_sdl_renderer(window), sprite_manager->texture(texture), &src_rect, &dst_rect))
-                    throw fd::error_t(SDL_GetError());
+                        if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), sprite_manager->texture(texture), &src_rect, &dst_rect, 0, nullptr, SDL_FLIP_NONE))
+                            throw fd::error_t(SDL_GetError());
+                    }
+                }
             }
 
+            // Sprites
             auto rendable_view = registry.view<transform_t, sprite_t>();
             rendable_view.each([&](auto& pos, auto& sprite) {
+                SDL_FRect src_rect;
+                src_rect.x = sprite.texture_offset.x;
+                src_rect.y = sprite.texture_offset.y;
+                src_rect.w = sprite.size.x;
+                src_rect.h = sprite.size.y;
+
                 SDL_FRect dst_rect;
-                dst_rect.x = (pos.position.x - sprite.size.x * 0.5f) + camera_tf.position.x;
-                dst_rect.y = ((window_height - pos.position.y) - sprite.size.y * 0.5f) + camera_tf.position.y;
-                dst_rect.w = sprite.size.x;
-                dst_rect.h = sprite.size.y;
+                dst_rect.x = (pos.position.x - sprite.size.x * 0.5f) - camera_pos.x;
+                dst_rect.y = ((window_height - pos.position.y) - sprite.size.y * 0.5f) + camera_pos.y;
+                dst_rect.w = sprite.size.x * pixel_scale;
+                dst_rect.h = sprite.size.y * pixel_scale;
 
                 auto texture = sprite_manager->texture(sprite.texture);
 
-                if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), texture, nullptr, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE))
+                if (!SDL_RenderTextureRotated(platform->get_sdl_renderer(window), texture, &src_rect, &dst_rect, pos.angle, nullptr, SDL_FLIP_NONE))
                     throw fd::error_t(SDL_GetError());
                 });
 
             });
 
-        // present
         if (!SDL_RenderPresent(platform->get_sdl_renderer(window)))
             throw fd::error_t(SDL_GetError());
     }
@@ -250,6 +258,7 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
     {
         auto existing_game = api.get<rpg_game_t>();
 
+        fd::println("transfer state from old game to new game...");
         auto foo = existing_game->get_state();
         window = foo.p1;
         registry = std::move(*foo.p2);

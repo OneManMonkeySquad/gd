@@ -45,10 +45,19 @@ void run()
 
     while (true)
     {
+
         platform->update();
 
-        if (game->run_once() != update_result::keep_running)
-            break;
+        try
+        {
+            if (game->run_once() != update_result::keep_running)
+                break;
+        }
+        catch (const std::exception&)
+        {
+            fd::println("crash");
+            plugin_manager.blocking_wait_until_any_plugin_changes();
+        }
 
         plugin_manager.update();
     }
@@ -65,8 +74,15 @@ void run()
     plugin_manager.unload_all_plugins();
 }
 
+void foo(unsigned int, struct _EXCEPTION_POINTERS*)
+{
+    throw std::runtime_error("foo");
+}
+
 int main()
 {
+    _set_se_translator(foo);
+
     run();
     return 0;
 }

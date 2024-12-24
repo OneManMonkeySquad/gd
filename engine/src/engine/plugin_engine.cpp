@@ -16,7 +16,7 @@ namespace
 
     std::expected<void, fd::error_t> init()
     {
-        if (!SDL_Init(SDL_INIT_VIDEO))
+        if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
             return std::unexpected(fd::error_t(SDL_GetError()));
 
         return{};
@@ -55,8 +55,6 @@ namespace
         return &engine_events;
     }
 
-    bool _key_is_down[SDL_SCANCODE_COUNT] = { false };
-
     void update()
     {
         engine_events.clear();
@@ -70,14 +68,10 @@ namespace
             }
             else if (event.type == SDL_EVENT_KEY_DOWN)
             {
-                _key_is_down[event.key.scancode] = true;
-
                 input_events.append(fd::input_event::key_down);
             }
             else if (event.type == SDL_EVENT_KEY_UP)
             {
-                _key_is_down[event.key.scancode] = false;
-
                 input_events.append(fd::input_event::key_up);
             }
         }
@@ -99,9 +93,10 @@ namespace
         return &input_events;
     }
 
-    bool is_key_down(int key_code)
+    bool is_key_pressed(int key_code)
     {
-        return _key_is_down[key_code];
+        const bool* state = SDL_GetKeyboardState(nullptr);
+        return state[key_code];
     }
 }
 
@@ -127,7 +122,7 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
 
     fd::input_t input;
     input.get_input_events = get_input_events;
-    input.is_key_down = is_key_down;
+    input.is_key_pressed = is_key_pressed;
     api.set(input);
 }
 

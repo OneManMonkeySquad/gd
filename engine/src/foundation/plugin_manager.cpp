@@ -109,6 +109,31 @@ namespace fd
         dirty_files.push_back(absolute_file_path);
     }
 
+    void plugin_manager_t::blocking_wait_until_any_plugin_changes()
+    {
+        while (true)
+        {
+            {
+                std::scoped_lock lock{ dirty_files_lock };
+
+                bool any_plugin_changed = false;
+                for (auto& dirty_file_path : dirty_files)
+                {
+                    if (!plugin_modules.contains(dirty_file_path))
+                        continue;
+
+                    any_plugin_changed = true;
+                    break;
+                }
+
+                if (any_plugin_changed)
+                    return;
+            }
+
+            std::this_thread::sleep_for(std::chrono::milliseconds{ 500 });
+        }
+    }
+
     void plugin_manager_t::update()
     {
         // reload dirty files

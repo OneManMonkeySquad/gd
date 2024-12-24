@@ -41,6 +41,8 @@ namespace
         if (!texture)
             throw fd::error_t(SDL_GetError());
 
+        SDL_SetTextureScaleMode(texture, SDL_SCALEMODE_NEAREST);
+
         SDL_DestroySurface(surface);
 
         job_data->texture = texture;
@@ -88,6 +90,5 @@ extern "C" __declspec(dllexport) void load_plugin(fd::api_registry_t& api, bool 
 
 extern "C" __declspec(dllexport) void unload_plugin(fd::api_registry_t& api, bool reload)
 {
-    // api.remove(foo);
-    // delete foo;
+    api.reset<fd::sprite_manager_t>();
 }

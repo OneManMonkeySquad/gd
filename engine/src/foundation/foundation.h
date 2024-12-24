@@ -49,7 +49,7 @@ namespace fd
     {
         event_stream_t* (*get_input_events)();
 
-        bool (*is_key_down)(int key_code);
+        bool (*is_key_pressed)(int key_code);
     };
 
 
